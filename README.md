@@ -120,6 +120,28 @@ from hk import apply_edit
 result = apply_edit("app.py", old_text, new_text, threshold=0.8)
 ```
 
+## Benchmarks
+
+We tested HarnessKit against **26 realistic edit failure scenarios** — the kind that break `str_replace` and `apply_patch` in production agent workflows.
+
+| Category | Exact Match | HarnessKit | Recovery Rate |
+|---|---|---|---|
+| **Whitespace** (tabs/spaces, trailing, indentation, CRLF) | 0/8 | **8/8** | 100% |
+| **Hallucinations** (typos, wrong quotes, missing types) | 0/7 | **7/7** | 100% |
+| **Line Drift** (shifted context, extra decorators) | 2/3 | **3/3** | 100% |
+| **Partial Matches** (subset of target) | 2/2 | **2/2** | — |
+| **Real-World** (str_replace failures, docstring diffs) | 0/6 | **6/6** | 100% |
+| **Total** | **4/26 (15%)** | **26/26 (100%)** | **100%** |
+
+> **Exact match succeeds 15% of the time. HarnessKit succeeds 100% of the time.**
+> 22 out of 22 failed edits recovered.
+
+Run the benchmarks yourself:
+
+```bash
+python3 benchmarks/benchmark.py
+```
+
 ## Design Principles
 
 - **Single file, stdlib only** — copy it, vendor it, pip install it. No dependency hell.

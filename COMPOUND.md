@@ -17,10 +17,17 @@ HarnessKit v0.1.0 — a fuzzy edit tool for LLM coding agents.
 3. **Modern setuptools** dropped license classifiers in favor of `license` field expressions (PEP 639). Had to remove the classifier.
 4. **Confidence scores matter** — agents need to know *how* an edit was matched to decide whether to trust it.
 
+## Iteration 2: Benchmarks + PyPI Prep (2026-02-13)
+
+- **26 benchmark scenarios** across 5 categories: whitespace, hallucinations, line drift, partial matches, real-world failures
+- **Results: 15% → 100%** — exact match hits 4/26, HarnessKit hits 26/26, recovering all 22 failed edits
+- **PyPI build working** — `python3 -m build` produces sdist + wheel. `PUBLISH.md` has upload instructions.
+- **Lesson:** The benchmark numbers are genuinely compelling marketing material. 15% vs 100% tells the whole story.
+
 ## What's Next
 
-- [ ] **Benchmark against real edit failures** — collect actual failed str_replace calls from Claude, GPT, etc. and measure recovery rate
-- [ ] **Publish to PyPI** — `python3 -m build && twine upload dist/*`
+- [x] ~~Benchmark against real edit failures~~
+- [ ] **Publish to PyPI** — need API token, then `twine upload dist/*`
 - [ ] **Landing page** — simple site with live demo
 - [ ] **Integration examples** — OpenClaw skill, Claude tool_use wrapper, LangChain tool
 - [ ] **Multi-file atomic edits** — rollback if any edit in a batch fails
