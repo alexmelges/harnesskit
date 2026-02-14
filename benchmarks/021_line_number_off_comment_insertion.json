@@ -1,0 +1,20 @@
+{
+  "name": "Comment insertion at wrong line number",
+  "category": "line_number_off",
+  "difficulty": 2,
+  "source": "Documentation update workflow",
+  "description": "LLM tries to insert comment but line numbers are stale",
+  "original": "def process_payment(amount, card_info):\n    # Validate card information\n    if not card_info.get('number'):\n        raise ValueError('Card number required')\n    \n    # Process the payment\n    result = payment_gateway.charge(amount, card_info)\n    \n    if result.success:\n        return {'status': 'success', 'transaction_id': result.id}\n    else:\n        return {'status': 'failed', 'error': result.error}",
+  "llm_edit": {
+    "old_text": "    # Validate card information",
+    "new_text": "    # Validate input parameters\n    # Validate card information"
+  },
+  "expected": "def process_payment(amount, card_info):\n    # Validate input parameters\n    # Validate card information\n    if not card_info.get('number'):\n        raise ValueError('Card number required')\n    \n    # Process the payment\n    result = payment_gateway.charge(amount, card_info)\n    \n    if result.success:\n        return {'status': 'success', 'transaction_id': result.id}\n    else:\n        return {'status': 'failed', 'error': result.error}",
+  "metadata": {
+    "model": "gpt-4o-mini",
+    "tool": "line_editor",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM calculated insertion point based on outdated line numbers"
+  }
+}

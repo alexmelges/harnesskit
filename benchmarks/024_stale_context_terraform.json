@@ -1,0 +1,20 @@
+{
+  "name": "Terraform resource stale naming", 
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Infrastructure as Code workflow",
+  "description": "LLM references old Terraform resource names from earlier context",
+  "original": "resource \"aws_instance\" \"web_server_production\" {\n  ami           = \"ami-0c55b159cbfafe1d0\"\n  instance_type = \"t3.micro\"\n  \n  vpc_security_group_ids = [aws_security_group.web_server_security_group.id]\n  \n  tags = {\n    Name = \"WebServerProduction\"\n    Environment = \"production\"\n  }\n}\n\nresource \"aws_security_group\" \"web_server_security_group\" {\n  name_prefix = \"web-server-sg\"\n  \n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}",
+  "llm_edit": {
+    "old_text": "resource \"aws_instance\" \"web\" {\n  ami           = \"ami-0c55b159cbfafe1d0\"\n  instance_type = \"t3.micro\"\n  \n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  \n  tags = {\n    Name = \"WebServerProduction\"\n    Environment = \"production\"\n  }\n}",
+    "new_text": "resource \"aws_instance\" \"web\" {\n  ami           = \"ami-0c55b159cbfafe1d0\"\n  instance_type = \"t3.small\"\n  \n  vpc_security_group_ids = [aws_security_group.web_sg.id]\n  \n  user_data = file(\"bootstrap.sh\")\n  \n  tags = {\n    Name = \"WebServerProduction\"\n    Environment = \"production\"\n  }\n}"
+  },
+  "expected": "resource \"aws_instance\" \"web_server_production\" {\n  ami           = \"ami-0c55b159cbfafe1d0\"\n  instance_type = \"t3.small\"\n  \n  vpc_security_group_ids = [aws_security_group.web_server_security_group.id]\n  \n  user_data = file(\"bootstrap.sh\")\n  \n  tags = {\n    Name = \"WebServerProduction\"\n    Environment = \"production\"\n  }\n}\n\nresource \"aws_security_group\" \"web_server_security_group\" {\n  name_prefix = \"web-server-sg\"\n  \n  ingress {\n    from_port   = 80\n    to_port     = 80\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "terraform_editor",
+    "language": "hcl",
+    "common_pattern": true,
+    "failure_reason": "LLM used abbreviated resource names from earlier discussion"
+  }
+}

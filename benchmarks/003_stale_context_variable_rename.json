@@ -1,0 +1,20 @@
+{
+  "name": "Stale context after variable rename",
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Real-world aider session",
+  "description": "LLM tries to modify code using old variable names that were changed earlier",
+  "original": "class UserManager:\n    def __init__(self, database_connection):\n        self.db_conn = database_connection\n        self.user_cache = {}\n    \n    def get_user(self, user_id):\n        if user_id in self.user_cache:\n            return self.user_cache[user_id]\n        return None",
+  "llm_edit": {
+    "old_text": "class UserManager:\n    def __init__(self, database_connection):\n        self.db = database_connection\n        self.cache = {}\n    \n    def get_user(self, user_id):\n        if user_id in self.cache:\n            return self.cache[user_id]\n        return None",
+    "new_text": "class UserManager:\n    def __init__(self, database_connection):\n        self.db = database_connection\n        self.cache = {}\n    \n    def get_user(self, user_id):\n        if user_id in self.cache:\n            return self.cache[user_id]\n        user = self.db.query('SELECT * FROM users WHERE id = ?', user_id)\n        self.cache[user_id] = user\n        return user"
+  },
+  "expected": "class UserManager:\n    def __init__(self, database_connection):\n        self.db_conn = database_connection\n        self.user_cache = {}\n    \n    def get_user(self, user_id):\n        if user_id in self.user_cache:\n            return self.user_cache[user_id]\n        user = self.db_conn.query('SELECT * FROM users WHERE id = ?', user_id)\n        self.user_cache[user_id] = user\n        return user",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "aider",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM used old shortened variable names from previous context"
+  }
+}

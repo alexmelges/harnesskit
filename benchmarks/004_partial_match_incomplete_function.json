@@ -1,0 +1,20 @@
+{
+  "name": "Partial function match missing context",
+  "category": "partial_match",
+  "difficulty": 3,
+  "source": "Common cursor editor issue", 
+  "description": "LLM only matches part of a function, missing the complete context block",
+  "original": "async function fetchUserData(userId) {\n    try {\n        const response = await fetch(`/api/users/${userId}`);\n        if (!response.ok) {\n            throw new Error('Failed to fetch user data');\n        }\n        return await response.json();\n    } catch (error) {\n        console.error('Error fetching user:', error);\n        return null;\n    }\n}",
+  "llm_edit": {
+    "old_text": "const response = await fetch(`/api/users/${userId}`);\n        if (!response.ok) {\n            throw new Error('Failed to fetch user data');\n        }\n        return await response.json();",
+    "new_text": "const response = await fetch(`/api/users/${userId}`, {\n            headers: { 'Authorization': `Bearer ${getToken()}` }\n        });\n        if (!response.ok) {\n            throw new Error('Failed to fetch user data');\n        }\n        const userData = await response.json();\n        return { ...userData, fetchedAt: new Date().toISOString() };"
+  },
+  "expected": "async function fetchUserData(userId) {\n    try {\n        const response = await fetch(`/api/users/${userId}`, {\n            headers: { 'Authorization': `Bearer ${getToken()}` }\n        });\n        if (!response.ok) {\n            throw new Error('Failed to fetch user data');\n        }\n        const userData = await response.json();\n        return { ...userData, fetchedAt: new Date().toISOString() };\n    } catch (error) {\n        console.error('Error fetching user:', error);\n        return null;\n    }\n}",
+  "metadata": {
+    "model": "gpt-4o",
+    "tool": "cursor",
+    "language": "javascript",
+    "common_pattern": true,
+    "failure_reason": "LLM matched only the core logic without surrounding try block indentation"
+  }
+}

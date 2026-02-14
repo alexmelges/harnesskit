@@ -1,0 +1,20 @@
+{
+  "name": "Windows vs Unix line ending mismatch",
+  "category": "encoding_issues",
+  "difficulty": 3,
+  "source": "Cross-platform development",
+  "description": "LLM produces Unix line endings but file has Windows line endings",
+  "original": "#!/bin/bash\r\n\r\nset -e\r\n\r\necho \"Starting deployment...\"\r\n\r\nif [ -z \"$ENVIRONMENT\" ]; then\r\n    echo \"Error: ENVIRONMENT not set\"\r\n    exit 1\r\nfi\r\n\r\necho \"Deploying to $ENVIRONMENT\"",
+  "llm_edit": {
+    "old_text": "if [ -z \"$ENVIRONMENT\" ]; then\n    echo \"Error: ENVIRONMENT not set\"\n    exit 1\nfi",
+    "new_text": "if [ -z \"$ENVIRONMENT\" ]; then\n    echo \"Error: ENVIRONMENT not set\"\n    exit 1\nfi\n\nif [ -z \"$VERSION\" ]; then\n    echo \"Error: VERSION not set\"\n    exit 1\nfi"
+  },
+  "expected": "#!/bin/bash\r\n\r\nset -e\r\n\r\necho \"Starting deployment...\"\r\n\r\nif [ -z \"$ENVIRONMENT\" ]; then\r\n    echo \"Error: ENVIRONMENT not set\"\r\n    exit 1\r\nfi\r\n\r\nif [ -z \"$VERSION\" ]; then\r\n    echo \"Error: VERSION not set\"\r\n    exit 1\r\nfi\r\n\r\necho \"Deploying to $ENVIRONMENT\"",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "bash_editor",
+    "language": "bash",
+    "common_pattern": true,
+    "failure_reason": "LLM search pattern uses \\n but file has \\r\\n line endings"
+  }
+}

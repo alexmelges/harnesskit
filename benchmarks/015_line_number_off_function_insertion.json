@@ -1,0 +1,20 @@
+{
+  "name": "Function insertion at wrong line after edits",
+  "category": "line_number_off",
+  "difficulty": 3,
+  "source": "Sequential editing session drift",
+  "description": "LLM inserts function at wrong location due to stale line number reference",
+  "original": "class MathUtils:\n    def __init__(self):\n        pass\n    \n    def add(self, a, b):\n        return a + b\n    \n    def subtract(self, a, b):\n        return a - b\n    \n    def multiply(self, a, b):\n        return a * b",
+  "llm_edit": {
+    "old_text": "    def subtract(self, a, b):\n        return a - b",
+    "new_text": "    def subtract(self, a, b):\n        return a - b\n    \n    def divide(self, a, b):\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b"
+  },
+  "expected": "class MathUtils:\n    def __init__(self):\n        pass\n    \n    def add(self, a, b):\n        return a + b\n    \n    def subtract(self, a, b):\n        return a - b\n    \n    def divide(self, a, b):\n        if b == 0:\n            raise ValueError(\"Cannot divide by zero\")\n        return a / b\n    \n    def multiply(self, a, b):\n        return a * b",
+  "metadata": {
+    "model": "claude-3-opus",
+    "tool": "line_based_editor",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM tried to insert after line 8 but line numbers shifted from previous edits"
+  }
+}

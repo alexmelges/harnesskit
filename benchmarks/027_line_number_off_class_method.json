@@ -1,0 +1,20 @@
+{
+  "name": "Class method insertion at wrong line",
+  "category": "line_number_off",
+  "difficulty": 2,
+  "source": "Object-oriented programming",
+  "description": "LLM inserts method at wrong line number after class structure changes",
+  "original": "class ShoppingCart:\n    def __init__(self):\n        self.items = []\n        self.total = 0\n    \n    def add_item(self, item, price):\n        self.items.append({'item': item, 'price': price})\n        self.total += price\n    \n    def get_total(self):\n        return self.total",
+  "llm_edit": {
+    "old_text": "    def get_total(self):\n        return self.total",
+    "new_text": "    def remove_item(self, item_name):\n        for i, item in enumerate(self.items):\n            if item['item'] == item_name:\n                self.total -= item['price']\n                del self.items[i]\n                break\n    \n    def get_total(self):\n        return self.total"
+  },
+  "expected": "class ShoppingCart:\n    def __init__(self):\n        self.items = []\n        self.total = 0\n    \n    def add_item(self, item, price):\n        self.items.append({'item': item, 'price': price})\n        self.total += price\n    \n    def remove_item(self, item_name):\n        for i, item in enumerate(self.items):\n            if item['item'] == item_name:\n                self.total -= item['price']\n                del self.items[i]\n                break\n    \n    def get_total(self):\n        return self.total",
+  "metadata": {
+    "model": "gpt-4o-mini",
+    "tool": "class_editor",
+    "language": "python", 
+    "common_pattern": true,
+    "failure_reason": "LLM tried to insert at specific line but class had been modified"
+  }
+}

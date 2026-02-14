@@ -1,0 +1,20 @@
+{
+  "name": "Docker Compose stale service names", 
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "DevOps configuration",
+  "description": "LLM uses old service names that were renamed earlier",
+  "original": "version: '3.8'\nservices:\n  web-application:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=production\n    depends_on:\n      - database-server\n  \n  database-server:\n    image: postgres:13\n    environment:\n      - POSTGRES_DB=myapp\n      - POSTGRES_USER=admin\n      - POSTGRES_PASSWORD=secret",
+  "llm_edit": {
+    "old_text": "  web:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=production\n    depends_on:\n      - db",
+    "new_text": "  web:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=production\n      - API_URL=http://localhost:4000\n    depends_on:\n      - db"
+  },
+  "expected": "version: '3.8'\nservices:\n  web-application:\n    build: .\n    ports:\n      - \"3000:3000\"\n    environment:\n      - NODE_ENV=production\n      - API_URL=http://localhost:4000\n    depends_on:\n      - database-server\n  \n  database-server:\n    image: postgres:13\n    environment:\n      - POSTGRES_DB=myapp\n      - POSTGRES_USER=admin\n      - POSTGRES_PASSWORD=secret",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "docker_editor", 
+    "language": "yaml",
+    "common_pattern": true,
+    "failure_reason": "LLM used shortened service names from earlier discussion"
+  }
+}

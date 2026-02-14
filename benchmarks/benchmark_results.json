@@ -1,0 +1,357 @@
+{
+  "timestamp": "2026-02-14 21:37:12.805786",
+  "total_tests": 30,
+  "overall_success_rate": 46.666666666666664,
+  "category_stats": {
+    "whitespace_mismatch": {
+      "total": 7,
+      "passed": 1,
+      "failed": 6,
+      "avg_confidence": 0.9571428571428571,
+      "avg_difficulty": 1.5714285714285714,
+      "success_rate": 14.285714285714285
+    },
+    "stale_context": {
+      "total": 5,
+      "passed": 0,
+      "failed": 5,
+      "avg_confidence": 0.9541000000000001,
+      "avg_difficulty": 3.0,
+      "success_rate": 0.0
+    },
+    "partial_match": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "avg_confidence": 1.0,
+      "avg_difficulty": 3.0,
+      "success_rate": 100.0
+    },
+    "indentation_drift": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4,
+      "avg_confidence": 0.95,
+      "avg_difficulty": 3.25,
+      "success_rate": 0.0
+    },
+    "line_number_off": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "avg_confidence": 1.0,
+      "avg_difficulty": 2.25,
+      "success_rate": 100.0
+    },
+    "encoding_issues": {
+      "total": 4,
+      "passed": 3,
+      "failed": 1,
+      "avg_confidence": 1.0,
+      "avg_difficulty": 4.25,
+      "success_rate": 75.0
+    }
+  },
+  "detailed_results": [
+    {
+      "name": "Aider Rust visibility modifier whitespace",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 37.9331111907959
+    },
+    {
+      "name": "Python function with extra whitespace",
+      "category": "whitespace_mismatch",
+      "difficulty": 1,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.57606315612793
+    },
+    {
+      "name": "Stale context after variable rename",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": false,
+      "confidence": 0.9624,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 1042.0739650726318
+    },
+    {
+      "name": "Partial function match missing context",
+      "category": "partial_match",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 29.997825622558594
+    },
+    {
+      "name": "Mixed tabs and spaces indentation",
+      "category": "indentation_drift",
+      "difficulty": 4,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.75296974182129
+    },
+    {
+      "name": "Wrong line number for import insertion",
+      "category": "line_number_off",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.15589714050293
+    },
+    {
+      "name": "Unicode normalization mismatch",
+      "category": "encoding_issues",
+      "difficulty": 5,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.291080474853516
+    },
+    {
+      "name": "Trailing whitespace mismatch in HTML",
+      "category": "whitespace_mismatch",
+      "difficulty": 1,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 31.75806999206543
+    },
+    {
+      "name": "React component with stale prop names",
+      "category": "stale_context",
+      "difficulty": 4,
+      "success": false,
+      "confidence": 0.9204,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 1601.1309623718262
+    },
+    {
+      "name": "SQL query partial match in multiline string",
+      "category": "partial_match",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.150890350341797
+    },
+    {
+      "name": "YAML indentation drift with 2-space vs 4-space",
+      "category": "indentation_drift",
+      "difficulty": 2,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.592037200927734
+    },
+    {
+      "name": "Go interface method spacing",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.366016387939453
+    },
+    {
+      "name": "CSS class name stale reference",
+      "category": "stale_context",
+      "difficulty": 2,
+      "success": false,
+      "confidence": 0.9863,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 584.0151309967041
+    },
+    {
+      "name": "JSON configuration partial object match",
+      "category": "partial_match",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 29.716968536376953
+    },
+    {
+      "name": "Function insertion at wrong line after edits",
+      "category": "line_number_off",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.234336853027344
+    },
+    {
+      "name": "Invisible Unicode characters in code",
+      "category": "encoding_issues",
+      "difficulty": 5,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 29.394865036010742
+    },
+    {
+      "name": "Markdown list with inconsistent spacing",
+      "category": "whitespace_mismatch",
+      "difficulty": 1,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.61587905883789
+    },
+    {
+      "name": "Docker Compose stale service names",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": false,
+      "confidence": 0.9748,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 1980.3228378295898
+    },
+    {
+      "name": "Rust macro partial match missing attributes",
+      "category": "partial_match",
+      "difficulty": 4,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.521154403686523
+    },
+    {
+      "name": "XML nested element indentation mismatch",
+      "category": "indentation_drift",
+      "difficulty": 3,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 30.251026153564453
+    },
+    {
+      "name": "Comment insertion at wrong line number",
+      "category": "line_number_off",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.305862426757812
+    },
+    {
+      "name": "Windows vs Unix line ending mismatch",
+      "category": "encoding_issues",
+      "difficulty": 3,
+      "success": false,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 29.80804443359375
+    },
+    {
+      "name": "PHP array formatting whitespace mismatch",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 29.74414825439453
+    },
+    {
+      "name": "Terraform resource stale naming",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": false,
+      "confidence": 0.9266,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 4211.03310585022
+    },
+    {
+      "name": "C struct partial match without typedef",
+      "category": "partial_match",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.966997146606445
+    },
+    {
+      "name": "Makefile tab vs space indentation",
+      "category": "indentation_drift",
+      "difficulty": 4,
+      "success": false,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 30.338764190673828
+    },
+    {
+      "name": "Class method insertion at wrong line",
+      "category": "line_number_off",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 29.99591827392578
+    },
+    {
+      "name": "UTF-8 BOM (Byte Order Mark) mismatch",
+      "category": "encoding_issues",
+      "difficulty": 4,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.18498420715332
+    },
+    {
+      "name": "PowerShell cmdlet parameter spacing",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.164241790771484
+    },
+    {
+      "name": "Kotlin data class partial match missing annotations",
+      "category": "partial_match",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 1.0,
+      "match_type": "exact",
+      "error": "",
+      "execution_time_ms": 30.205965042114258
+    }
+  ]
+}

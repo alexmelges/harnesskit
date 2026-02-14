@@ -1,0 +1,20 @@
+{
+  "name": "Markdown list with inconsistent spacing",
+  "category": "whitespace_mismatch", 
+  "difficulty": 1,
+  "source": "Documentation editing",
+  "description": "LLM creates markdown list with different spacing than original",
+  "original": "# Installation Guide\n\n## Requirements\n\n- Python 3.8+  \n- Node.js 16+  \n- Docker (optional)  \n\n## Setup Steps\n\n1. Clone the repository  \n2. Install dependencies  \n3. Run the application  ",
+  "llm_edit": {
+    "old_text": "## Requirements\n\n- Python 3.8+\n- Node.js 16+\n- Docker (optional)",
+    "new_text": "## Requirements\n\n- Python 3.8+\n- Node.js 16+\n- Redis server\n- Docker (optional)"
+  },
+  "expected": "# Installation Guide\n\n## Requirements\n\n- Python 3.8+  \n- Node.js 16+  \n- Redis server  \n- Docker (optional)  \n\n## Setup Steps\n\n1. Clone the repository  \n2. Install dependencies  \n3. Run the application  ",
+  "metadata": {
+    "model": "claude-3-haiku",
+    "tool": "markdown_editor",
+    "language": "markdown",
+    "common_pattern": true,
+    "failure_reason": "LLM removed trailing spaces from markdown lines"
+  }
+}

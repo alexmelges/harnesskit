@@ -1,0 +1,20 @@
+{
+  "name": "SQL query partial match in multiline string",
+  "category": "partial_match",
+  "difficulty": 3,
+  "source": "Database development with LLM assistance",
+  "description": "LLM matches only part of a multiline SQL string, missing surrounding context",
+  "original": "def get_user_analytics(self, user_id: int, start_date: str, end_date: str):\n    query = \"\"\"\n        SELECT \n            u.id,\n            u.username,\n            COUNT(DISTINCT s.id) as session_count,\n            SUM(s.duration) as total_time,\n            AVG(s.duration) as avg_session_time\n        FROM users u\n        LEFT JOIN sessions s ON u.id = s.user_id\n        WHERE u.id = %s \n          AND s.created_at BETWEEN %s AND %s\n        GROUP BY u.id, u.username\n        ORDER BY total_time DESC\n    \"\"\"\n    return self.db.fetchone(query, (user_id, start_date, end_date))",
+  "llm_edit": {
+    "old_text": "SELECT \n            u.id,\n            u.username,\n            COUNT(DISTINCT s.id) as session_count,\n            SUM(s.duration) as total_time,\n            AVG(s.duration) as avg_session_time\n        FROM users u\n        LEFT JOIN sessions s ON u.id = s.user_id\n        WHERE u.id = %s \n          AND s.created_at BETWEEN %s AND %s\n        GROUP BY u.id, u.username",
+    "new_text": "SELECT \n            u.id,\n            u.username,\n            u.email,\n            COUNT(DISTINCT s.id) as session_count,\n            SUM(s.duration) as total_time,\n            AVG(s.duration) as avg_session_time,\n            MAX(s.created_at) as last_activity\n        FROM users u\n        LEFT JOIN sessions s ON u.id = s.user_id\n        WHERE u.id = %s \n          AND s.created_at BETWEEN %s AND %s\n        GROUP BY u.id, u.username, u.email"
+  },
+  "expected": "def get_user_analytics(self, user_id: int, start_date: str, end_date: str):\n    query = \"\"\"\n        SELECT \n            u.id,\n            u.username,\n            u.email,\n            COUNT(DISTINCT s.id) as session_count,\n            SUM(s.duration) as total_time,\n            AVG(s.duration) as avg_session_time,\n            MAX(s.created_at) as last_activity\n        FROM users u\n        LEFT JOIN sessions s ON u.id = s.user_id\n        WHERE u.id = %s \n          AND s.created_at BETWEEN %s AND %s\n        GROUP BY u.id, u.username, u.email\n        ORDER BY total_time DESC\n    \"\"\"\n    return self.db.fetchone(query, (user_id, start_date, end_date))",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "aider",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM only matched the SQL SELECT portion without the surrounding triple quotes and indentation"
+  }
+}

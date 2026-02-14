@@ -1,0 +1,20 @@
+{
+  "name": "JSON configuration partial object match",
+  "category": "partial_match",
+  "difficulty": 2,
+  "source": "Configuration file editing",
+  "description": "LLM only matches part of JSON object without surrounding structure",
+  "original": "{\n  \"app\": {\n    \"name\": \"MyApp\",\n    \"version\": \"1.0.0\",\n    \"features\": {\n      \"authentication\": true,\n      \"logging\": false,\n      \"analytics\": true\n    }\n  },\n  \"database\": {\n    \"type\": \"postgresql\",\n    \"host\": \"localhost\"\n  }\n}",
+  "llm_edit": {
+    "old_text": "\"features\": {\n      \"authentication\": true,\n      \"logging\": false,\n      \"analytics\": true\n    }",
+    "new_text": "\"features\": {\n      \"authentication\": true,\n      \"logging\": true,\n      \"analytics\": true,\n      \"caching\": false\n    }"
+  },
+  "expected": "{\n  \"app\": {\n    \"name\": \"MyApp\",\n    \"version\": \"1.0.0\",\n    \"features\": {\n      \"authentication\": true,\n      \"logging\": true,\n      \"analytics\": true,\n      \"caching\": false\n    }\n  },\n  \"database\": {\n    \"type\": \"postgresql\",\n    \"host\": \"localhost\"\n  }\n}",
+  "metadata": {
+    "model": "gpt-4o-mini",
+    "tool": "json_editor",
+    "language": "json",
+    "common_pattern": true,
+    "failure_reason": "LLM matched only the features object without surrounding JSON structure indentation"
+  }
+}

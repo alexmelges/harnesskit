@@ -1,0 +1,20 @@
+{
+  "name": "PHP array formatting whitespace mismatch",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "PHP development",
+  "description": "LLM formats PHP array with different spacing than original",
+  "original": "<?php\n\n$config = [\n    'database' => [\n        'host'     => 'localhost',\n        'username' => 'admin',\n        'password' => 'secret123',\n        'name'     => 'myapp_db'\n    ],\n    'cache' => [\n        'driver'   => 'redis',\n        'host'     => '127.0.0.1',\n        'port'     => 6379\n    ]\n];",
+  "llm_edit": {
+    "old_text": "'database' => [\n        'host' => 'localhost',\n        'username' => 'admin',\n        'password' => 'secret123',\n        'name' => 'myapp_db'\n    ]",
+    "new_text": "'database' => [\n        'host' => 'localhost',\n        'username' => 'admin',\n        'password' => 'secret123',\n        'name' => 'myapp_db',\n        'charset' => 'utf8mb4'\n    ]"
+  },
+  "expected": "<?php\n\n$config = [\n    'database' => [\n        'host'     => 'localhost',\n        'username' => 'admin',\n        'password' => 'secret123',\n        'name'     => 'myapp_db',\n        'charset'  => 'utf8mb4'\n    ],\n    'cache' => [\n        'driver'   => 'redis',\n        'host'     => '127.0.0.1',\n        'port'     => 6379\n    ]\n];",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "php_editor",
+    "language": "php",
+    "common_pattern": true,
+    "failure_reason": "LLM didn't preserve aligned arrow spacing in associative array"
+  }
+}

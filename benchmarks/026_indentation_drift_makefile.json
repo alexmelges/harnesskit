@@ -1,0 +1,20 @@
+{
+  "name": "Makefile tab vs space indentation",
+  "category": "indentation_drift",
+  "difficulty": 4,
+  "source": "Build system configuration",
+  "description": "LLM uses spaces but Makefile requires tabs for commands",
+  "original": "CC=gcc\nCFLAGS=-Wall -Wextra -std=c99\nSRCDIR=src\nOBJDIR=obj\nSOURCES=$(wildcard $(SRCDIR)/*.c)\nOBJECTS=$(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)\n\nall: myapp\n\nmyapp: $(OBJECTS)\n\t$(CC) $(OBJECTS) -o $@\n\n$(OBJDIR)/%.o: $(SRCDIR)/%.c\n\t@mkdir -p $(OBJDIR)\n\t$(CC) $(CFLAGS) -c $< -o $@\n\nclean:\n\trm -rf $(OBJDIR) myapp",
+  "llm_edit": {
+    "old_text": "myapp: $(OBJECTS)\n    $(CC) $(OBJECTS) -o $@\n\n$(OBJDIR)/%.o: $(SRCDIR)/%.c\n    @mkdir -p $(OBJDIR)\n    $(CC) $(CFLAGS) -c $< -o $@",
+    "new_text": "myapp: $(OBJECTS)\n    $(CC) $(OBJECTS) -o $@ -lm\n\n$(OBJDIR)/%.o: $(SRCDIR)/%.c\n    @mkdir -p $(OBJDIR)\n    $(CC) $(CFLAGS) -c $< -o $@"
+  },
+  "expected": "CC=gcc\nCFLAGS=-Wall -Wextra -std=c99\nSRCDIR=src\nOBJDIR=obj\nSOURCES=$(wildcard $(SRCDIR)/*.c)\nOBJECTS=$(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)\n\nall: myapp\n\nmyapp: $(OBJECTS)\n\t$(CC) $(OBJECTS) -o $@ -lm\n\n$(OBJDIR)/%.o: $(SRCDIR)/%.c\n\t@mkdir -p $(OBJDIR)\n\t$(CC) $(CFLAGS) -c $< -o $@\n\nclean:\n\trm -rf $(OBJDIR) myapp",
+  "metadata": {
+    "model": "claude-3-opus",
+    "tool": "make_editor", 
+    "language": "makefile",
+    "common_pattern": true,
+    "failure_reason": "LLM used spaces for command indentation but Makefiles require tabs"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "PowerShell cmdlet parameter spacing",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "Windows automation scripting",
+  "description": "LLM formats PowerShell parameters with different spacing",
+  "original": "# Deploy application to Azure\nParam(\n    [Parameter(Mandatory=$true)]\n    [string]$ResourceGroupName,\n    \n    [Parameter(Mandatory=$true)]\n    [string]$AppServiceName,\n    \n    [Parameter(Mandatory=$false)]\n    [string]$Environment = \"staging\"\n)\n\nWrite-Host \"Starting deployment to $Environment\"\n\n$webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName\n\nif ($null -eq $webApp) {\n    Write-Error \"Web app not found: $AppServiceName\"\n    exit 1\n}",
+  "llm_edit": {
+    "old_text": "$webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName\n\nif ($null -eq $webApp) {\n    Write-Error \"Web app not found: $AppServiceName\"\n    exit 1\n}",
+    "new_text": "$webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName\n\nif ($null -eq $webApp) {\n    Write-Error \"Web app not found: $AppServiceName\"\n    exit 1\n}\n\nWrite-Host \"Found web app: $($webApp.Name)\"\nWrite-Host \"Current state: $($webApp.State)\""
+  },
+  "expected": "# Deploy application to Azure\nParam(\n    [Parameter(Mandatory=$true)]\n    [string]$ResourceGroupName,\n    \n    [Parameter(Mandatory=$true)]\n    [string]$AppServiceName,\n    \n    [Parameter(Mandatory=$false)]\n    [string]$Environment = \"staging\"\n)\n\nWrite-Host \"Starting deployment to $Environment\"\n\n$webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName\n\nif ($null -eq $webApp) {\n    Write-Error \"Web app not found: $AppServiceName\"\n    exit 1\n}\n\nWrite-Host \"Found web app: $($webApp.Name)\"\nWrite-Host \"Current state: $($webApp.State)\"",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "powershell_editor",
+    "language": "powershell",
+    "common_pattern": true,
+    "failure_reason": "LLM changed spacing around cmdlet parameters"
+  }
+}

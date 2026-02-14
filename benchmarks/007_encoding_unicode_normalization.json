@@ -1,0 +1,21 @@
+{
+  "name": "Unicode normalization mismatch",
+  "category": "encoding_issues",
+  "difficulty": 5,
+  "source": "Real encoding edge case",
+  "description": "LLM produces different Unicode normalization than source file",
+  "original": "# Configuration file for café management\nclass CaféManager:\n    def __init__(self):\n        self.menu_items = {\n            'café_au_lait': 3.50,\n            'café_noir': 2.75,\n            'naïve_blend': 4.25\n        }\n    \n    def get_price(self, item_name: str) -> float:\n        return self.menu_items.get(item_name, 0.0)",
+  "llm_edit": {
+    "old_text": "class CaféManager:\n    def __init__(self):\n        self.menu_items = {\n            'café_au_lait': 3.50,\n            'café_noir': 2.75,\n            'naïve_blend': 4.25\n        }",
+    "new_text": "class CaféManager:\n    def __init__(self):\n        self.menu_items = {\n            'café_au_lait': 3.50,\n            'café_noir': 2.75,\n            'naïve_blend': 4.25,\n            'résumé_special': 5.00\n        }"
+  },
+  "expected": "# Configuration file for café management\nclass CaféManager:\n    def __init__(self):\n        self.menu_items = {\n            'café_au_lait': 3.50,\n            'café_noir': 2.75,\n            'naïve_blend': 4.25,\n            'résumé_special': 5.00\n        }\n    \n    def get_price(self, item_name: str) -> float:\n        return self.menu_items.get(item_name, 0.0)",
+  "metadata": {
+    "model": "claude-3.5-sonnet", 
+    "tool": "str_replace_editor",
+    "language": "python",
+    "common_pattern": false,
+    "failure_reason": "Unicode characters normalized differently (NFC vs NFD) causing byte-level mismatch",
+    "note": "Accented characters like é, à, ï may have different byte representations"
+  }
+}

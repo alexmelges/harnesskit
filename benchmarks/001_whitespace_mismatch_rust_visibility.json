@@ -1,0 +1,20 @@
+{
+  "name": "Aider Rust visibility modifier whitespace",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "GitHub issue Aider-AI/aider#827",
+  "description": "LLM tries to add pub keyword but whitespace/indentation doesn't match exactly",
+  "original": "struct Shards {\n    len: u32,\n    arr_offset: u64,\n}\n\nimpl Shards {\n    fn init(&mut self, all: &mut Allocator, shard_len: u32, max_len: u64) -> io::Result<()> {",
+  "llm_edit": {
+    "old_text": "struct Shards {\n len: u32,\n arr_offset: u64,\n}\n\nimpl Shards {\n fn init(&mut self, all: &mut Allocator, shard_len: u32, max_len: u64) -> io::Result<()> {",
+    "new_text": "pub struct Shards {\n len: u32,\n arr_offset: u64,\n}\n\nimpl Shards {\n pub fn init(&mut self, all: &mut Allocator, shard_len: u32, max_len: u64) -> io::Result<()> {"
+  },
+  "expected": "pub struct Shards {\n    len: u32,\n    arr_offset: u64,\n}\n\nimpl Shards {\n    pub fn init(&mut self, all: &mut Allocator, shard_len: u32, max_len: u64) -> io::Result<()> {",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "aider",
+    "language": "rust",
+    "common_pattern": true,
+    "failure_reason": "LLM used single space indentation but file has 4-space indentation"
+  }
+}

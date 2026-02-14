@@ -1,0 +1,20 @@
+{
+  "name": "Mixed tabs and spaces indentation",
+  "category": "indentation_drift",
+  "difficulty": 4,
+  "source": "Real vim + LLM editing session",
+  "description": "LLM uses spaces but file uses tabs, causing exact match failure",
+  "original": "class DatabaseConfig:\n\tdef __init__(self):\n\t\tself.host = 'localhost'\n\t\tself.port = 5432\n\t\tself.database = 'myapp'\n\t\n\tdef get_connection_string(self):\n\t\treturn f\"postgresql://{self.host}:{self.port}/{self.database}\"",
+  "llm_edit": {
+    "old_text": "class DatabaseConfig:\n    def __init__(self):\n        self.host = 'localhost'\n        self.port = 5432\n        self.database = 'myapp'\n    \n    def get_connection_string(self):\n        return f\"postgresql://{self.host}:{self.port}/{self.database}\"",
+    "new_text": "class DatabaseConfig:\n    def __init__(self):\n        self.host = 'localhost'\n        self.port = 5432\n        self.database = 'myapp'\n        self.username = None\n        self.password = None\n    \n    def get_connection_string(self):\n        if self.username and self.password:\n            return f\"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}\"\n        return f\"postgresql://{self.host}:{self.port}/{self.database}\""
+  },
+  "expected": "class DatabaseConfig:\n\tdef __init__(self):\n\t\tself.host = 'localhost'\n\t\tself.port = 5432\n\t\tself.database = 'myapp'\n\t\tself.username = None\n\t\tself.password = None\n\t\n\tdef get_connection_string(self):\n\t\tif self.username and self.password:\n\t\t\treturn f\"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}\"\n\t\treturn f\"postgresql://{self.host}:{self.port}/{self.database}\"",
+  "metadata": {
+    "model": "claude-3-opus",
+    "tool": "vim_with_llm",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM used 4 spaces for indentation but file uses tabs"
+  }
+}

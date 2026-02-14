@@ -1,0 +1,20 @@
+{
+  "name": "CSS class name stale reference",
+  "category": "stale_context",
+  "difficulty": 2,
+  "source": "Frontend styling workflow",
+  "description": "LLM references old CSS class names after they were renamed",
+  "original": ".user-profile-card {\n    background-color: #fff;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n}\n\n.user-profile-card .avatar {\n    width: 60px;\n    height: 60px;\n    border-radius: 50%;\n}",
+  "llm_edit": {
+    "old_text": ".profile-card {\n    background-color: #fff;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n}\n\n.profile-card .avatar {\n    width: 60px;\n    height: 60px;\n    border-radius: 50%;\n}",
+    "new_text": ".profile-card {\n    background-color: #fff;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    transition: transform 0.2s ease;\n}\n\n.profile-card:hover {\n    transform: translateY(-2px);\n}\n\n.profile-card .avatar {\n    width: 60px;\n    height: 60px;\n    border-radius: 50%;\n}"
+  },
+  "expected": ".user-profile-card {\n    background-color: #fff;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    transition: transform 0.2s ease;\n}\n\n.user-profile-card:hover {\n    transform: translateY(-2px);\n}\n\n.user-profile-card .avatar {\n    width: 60px;\n    height: 60px;\n    border-radius: 50%;\n}",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "css_editor",
+    "language": "css",
+    "common_pattern": true,
+    "failure_reason": "LLM used shortened class name from earlier discussion"
+  }
+}

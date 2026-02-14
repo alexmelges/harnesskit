@@ -1,0 +1,20 @@
+{
+  "name": "Go interface method spacing",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "Go development pattern",
+  "description": "LLM formats Go interface methods with different spacing",
+  "original": "type UserService interface {\n\tGetUser(id string) (*User, error)\n\tCreateUser(user *User) error\n\tDeleteUser(id string) error\n}",
+  "llm_edit": {
+    "old_text": "type UserService interface {\n    GetUser(id string) (*User, error)\n    CreateUser(user *User) error\n    DeleteUser(id string) error\n}",
+    "new_text": "type UserService interface {\n    GetUser(id string) (*User, error)\n    CreateUser(user *User) error\n    UpdateUser(id string, user *User) error\n    DeleteUser(id string) error\n}"
+  },
+  "expected": "type UserService interface {\n\tGetUser(id string) (*User, error)\n\tCreateUser(user *User) error\n\tUpdateUser(id string, user *User) error\n\tDeleteUser(id string) error\n}",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "go_editor",
+    "language": "go",
+    "common_pattern": true,
+    "failure_reason": "LLM used spaces instead of tabs for Go formatting"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Wrong line number for import insertion",
+  "category": "line_number_off",
+  "difficulty": 2,
+  "source": "Line-number-based edit tool failure",
+  "description": "LLM references wrong line numbers after file was modified",
+  "original": "import os\nimport sys\nfrom typing import Dict, List\n\nclass FileProcessor:\n    def __init__(self, base_path: str):\n        self.base_path = base_path\n        self.processed_files = []\n    \n    def process_file(self, filename: str) -> bool:\n        filepath = os.path.join(self.base_path, filename)\n        return os.path.exists(filepath)",
+  "llm_edit": {
+    "old_text": "import os\nimport sys",
+    "new_text": "import os\nimport sys\nimport json\nimport logging"
+  },
+  "expected": "import os\nimport sys\nimport json\nimport logging\nfrom typing import Dict, List\n\nclass FileProcessor:\n    def __init__(self, base_path: str):\n        self.base_path = base_path\n        self.processed_files = []\n    \n    def process_file(self, filename: str) -> bool:\n        filepath = os.path.join(self.base_path, filename)\n        return os.path.exists(filepath)",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "custom_line_editor",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM tried to insert at line 3 but counted wrong after previous edits"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Invisible Unicode characters in code",
+  "category": "encoding_issues",
+  "difficulty": 5,
+  "source": "Copy-paste from web source",
+  "description": "LLM fails to match due to invisible Unicode characters (zero-width spaces)",
+  "original": "function calculatePrice(basePrice, taxRate) {\n    const tax = basePrice * taxRate;\n    return basePrice + tax;\n}",
+  "llm_edit": {
+    "old_text": "function calculatePrice(basePrice, taxRate) {\n    const tax = basePrice * taxRate;\n    return basePrice + tax;\n}",
+    "new_text": "function calculatePrice(basePrice, taxRate, discountRate = 0) {\n    const tax = basePrice * taxRate;\n    const discount = basePrice * discountRate;\n    return basePrice + tax - discount;\n}"
+  },
+  "expected": "function calculatePrice(basePrice, taxRate, discountRate = 0) {\n    const tax = basePrice * taxRate;\n    const discount = basePrice * discountRate;\n    return basePrice + tax - discount;\n}",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "web_editor",
+    "language": "javascript",
+    "common_pattern": false,
+    "failure_reason": "Original contains zero-width spaces (U+200B) that LLM search pattern doesn't include",
+    "note": "This simulates copy-paste from websites that inject invisible characters"
+  }
+}

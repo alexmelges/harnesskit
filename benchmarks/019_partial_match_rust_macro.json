@@ -1,0 +1,20 @@
+{
+  "name": "Rust macro partial match missing attributes",
+  "category": "partial_match",
+  "difficulty": 4,
+  "source": "Rust development",
+  "description": "LLM matches only part of Rust macro without surrounding attributes",
+  "original": "#[derive(Debug, Clone, PartialEq)]\n#[serde(rename_all = \"camelCase\")]\npub struct ApiResponse<T> {\n    pub success: bool,\n    pub data: Option<T>,\n    pub error_message: Option<String>,\n    pub timestamp: u64,\n}\n\nimpl<T> ApiResponse<T> {\n    pub fn new(data: T) -> Self {\n        Self {\n            success: true,\n            data: Some(data),\n            error_message: None,\n            timestamp: std::time::SystemTime::now()\n                .duration_since(std::time::UNIX_EPOCH)\n                .unwrap()\n                .as_secs(),\n        }\n    }\n}",
+  "llm_edit": {
+    "old_text": "pub struct ApiResponse<T> {\n    pub success: bool,\n    pub data: Option<T>,\n    pub error_message: Option<String>,\n    pub timestamp: u64,\n}",
+    "new_text": "pub struct ApiResponse<T> {\n    pub success: bool,\n    pub data: Option<T>,\n    pub error_message: Option<String>,\n    pub error_code: Option<i32>,\n    pub timestamp: u64,\n}"
+  },
+  "expected": "#[derive(Debug, Clone, PartialEq)]\n#[serde(rename_all = \"camelCase\")]\npub struct ApiResponse<T> {\n    pub success: bool,\n    pub data: Option<T>,\n    pub error_message: Option<String>,\n    pub error_code: Option<i32>,\n    pub timestamp: u64,\n}\n\nimpl<T> ApiResponse<T> {\n    pub fn new(data: T) -> Self {\n        Self {\n            success: true,\n            data: Some(data),\n            error_message: None,\n            timestamp: std::time::SystemTime::now()\n                .duration_since(std::time::UNIX_EPOCH)\n                .unwrap()\n                .as_secs(),\n        }\n    }\n}",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "rust_editor",
+    "language": "rust",
+    "common_pattern": true,
+    "failure_reason": "LLM matched struct definition without derive attributes and surrounding context"
+  }
+}

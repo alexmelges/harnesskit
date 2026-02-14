@@ -1,0 +1,20 @@
+{
+  "name": "XML nested element indentation mismatch",
+  "category": "indentation_drift",
+  "difficulty": 3,
+  "source": "XML configuration editing",
+  "description": "LLM uses different indentation for nested XML elements",
+  "original": "<configuration>\n  <database>\n    <connection>\n      <host>localhost</host>\n      <port>5432</port>\n      <database>myapp</database>\n    </connection>\n    <pool>\n      <min-size>5</min-size>\n      <max-size>20</max-size>\n    </pool>\n  </database>\n</configuration>",
+  "llm_edit": {
+    "old_text": "  <database>\n      <connection>\n          <host>localhost</host>\n          <port>5432</port>\n          <database>myapp</database>\n      </connection>\n      <pool>\n          <min-size>5</min-size>\n          <max-size>20</max-size>\n      </pool>\n  </database>",
+    "new_text": "  <database>\n      <connection>\n          <host>localhost</host>\n          <port>5432</port>\n          <database>myapp</database>\n          <ssl>true</ssl>\n      </connection>\n      <pool>\n          <min-size>5</min-size>\n          <max-size>20</max-size>\n          <timeout>30</timeout>\n      </pool>\n  </database>"
+  },
+  "expected": "<configuration>\n  <database>\n    <connection>\n      <host>localhost</host>\n      <port>5432</port>\n      <database>myapp</database>\n      <ssl>true</ssl>\n    </connection>\n    <pool>\n      <min-size>5</min-size>\n      <max-size>20</max-size>\n      <timeout>30</timeout>\n    </pool>\n  </database>\n</configuration>",
+  "metadata": {
+    "model": "claude-3-opus",
+    "tool": "xml_editor",
+    "language": "xml",
+    "common_pattern": true,
+    "failure_reason": "LLM used 4-space indentation steps instead of 2-space"
+  }
+}

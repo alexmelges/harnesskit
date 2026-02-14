@@ -1,0 +1,20 @@
+{
+  "name": "React component with stale prop names",
+  "category": "stale_context",
+  "difficulty": 4,
+  "source": "React development with LLM",
+  "description": "LLM uses old prop names that were refactored earlier in the session",
+  "original": "import React from 'react';\n\nconst UserProfile = ({ userInfo, onUpdateProfile }) => {\n  const handleSave = () => {\n    onUpdateProfile(userInfo);\n  };\n\n  return (\n    <div className=\"profile\">\n      <h2>{userInfo.displayName}</h2>\n      <p>{userInfo.emailAddress}</p>\n      <button onClick={handleSave}>Save Changes</button>\n    </div>\n  );\n};",
+  "llm_edit": {
+    "old_text": "const UserProfile = ({ user, onUpdate }) => {\n  const handleSave = () => {\n    onUpdate(user);\n  };\n\n  return (\n    <div className=\"profile\">\n      <h2>{user.name}</h2>\n      <p>{user.email}</p>\n      <button onClick={handleSave}>Save Changes</button>\n    </div>\n  );",
+    "new_text": "const UserProfile = ({ user, onUpdate }) => {\n  const [isEditing, setIsEditing] = useState(false);\n  \n  const handleSave = () => {\n    onUpdate(user);\n    setIsEditing(false);\n  };\n\n  return (\n    <div className=\"profile\">\n      <h2>{user.name}</h2>\n      <p>{user.email}</p>\n      <button onClick={() => setIsEditing(!isEditing)}>\n        {isEditing ? 'Cancel' : 'Edit'}\n      </button>\n      {isEditing && <button onClick={handleSave}>Save Changes</button>}\n    </div>\n  );"
+  },
+  "expected": "import React, { useState } from 'react';\n\nconst UserProfile = ({ userInfo, onUpdateProfile }) => {\n  const [isEditing, setIsEditing] = useState(false);\n  \n  const handleSave = () => {\n    onUpdateProfile(userInfo);\n    setIsEditing(false);\n  };\n\n  return (\n    <div className=\"profile\">\n      <h2>{userInfo.displayName}</h2>\n      <p>{userInfo.emailAddress}</p>\n      <button onClick={() => setIsEditing(!isEditing)}>\n        {isEditing ? 'Cancel' : 'Edit'}\n      </button>\n      {isEditing && <button onClick={handleSave}>Save Changes</button>}\n    </div>\n  );\n};",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "cursor",
+    "language": "javascript",
+    "common_pattern": true,
+    "failure_reason": "LLM used old shortened prop names from earlier refactoring discussion"
+  }
+}

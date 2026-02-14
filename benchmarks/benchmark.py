@@ -297,6 +297,204 @@ bench(
 )
 
 
+# ===================== MULTI-LANGUAGE REAL FAILURES =====================
+# Cases modeled after real GitHub issues from Aider, Cursor, Continue, etc.
+
+bench(
+    "TypeScript: optional chaining hallucinated",
+    "hallucination",
+    "const name = user.profile.name;\nconst email = user.profile.email;\n",
+    "const name = user?.profile?.name;\nconst email = user?.profile?.email;\n",
+)
+
+bench(
+    "Rust: lifetime annotation dropped",
+    "hallucination",
+    "fn parse<'a>(input: &'a str) -> Result<&'a str, Error> {\n    Ok(&input[1..])\n}\n",
+    "fn parse(input: &str) -> Result<&str, Error> {\n    Ok(&input[1..])\n}\n",
+)
+
+bench(
+    "Go: error handling rewritten",
+    "hallucination",
+    "result, err := doWork(ctx)\nif err != nil {\n\treturn fmt.Errorf(\"doWork failed: %w\", err)\n}\n",
+    "result, err := doWork(ctx)\nif err != nil {\n\treturn fmt.Errorf(\"failed to do work: %w\", err)\n}\n",
+)
+
+bench(
+    "JSX: self-closing vs explicit close",
+    "hallucination",
+    '<Button onClick={handleClick} className="primary" />\n',
+    '<Button onClick={handleClick} className="primary"></Button>\n',
+)
+
+bench(
+    "Python: f-string vs .format()",
+    "hallucination",
+    'msg = f"Hello {name}, you have {count} items"\nprint(msg)\n',
+    'msg = "Hello {}, you have {} items".format(name, count)\nprint(msg)\n',
+)
+
+bench(
+    "SQL: case sensitivity difference",
+    "hallucination",
+    "SELECT u.id, u.name FROM users u WHERE u.active = TRUE ORDER BY u.name;\n",
+    "select u.id, u.name from users u where u.active = true order by u.name;\n",
+)
+
+# ===================== COMPLEX WHITESPACE =====================
+
+bench(
+    "Python: nested indentation 3-deep wrong",
+    "whitespace",
+    "class Server:\n    def handle(self, req):\n        if req.valid:\n            for item in req.items:\n                self.process(item)\n",
+    "class Server:\n  def handle(self, req):\n    if req.valid:\n      for item in req.items:\n        self.process(item)\n",
+)
+
+bench(
+    "YAML: indentation matters semantically",
+    "whitespace",
+    "services:\n  web:\n    image: nginx:latest\n    ports:\n      - \"80:80\"\n    volumes:\n      - ./html:/usr/share/nginx/html\n",
+    "services:\n    web:\n        image: nginx:latest\n        ports:\n            - \"80:80\"\n        volumes:\n            - ./html:/usr/share/nginx/html\n",
+)
+
+bench(
+    "Alignment whitespace in table",
+    "whitespace",
+    "NAME      = 'myapp'\nVERSION   = '1.0.0'\nAUTHOR    = 'dev'\n",
+    "NAME = 'myapp'\nVERSION = '1.0.0'\nAUTHOR = 'dev'\n",
+)
+
+# ===================== CONTEXT DRIFT =====================
+
+bench(
+    "Model saw old import list",
+    "line_drift",
+    "import os\nimport sys\nimport json\nimport logging\nfrom pathlib import Path\n\ndef main():\n    logging.info('start')\n",
+    "import os\nimport sys\nimport json\nfrom pathlib import Path\n\ndef main():\n    logging.info('start')\n",
+)
+
+bench(
+    "Function was renamed since model read file",
+    "line_drift",
+    "def process_request(req):\n    data = validate(req)\n    return transform(data)\n",
+    "def handle_request(req):\n    data = validate(req)\n    return transform(data)\n",
+)
+
+# ===================== HARD CASES =====================
+# These push the boundaries — lower similarity, multiple differences
+
+bench(
+    "Multiple hallucinations in one block",
+    "hard",
+    textwrap.dedent("""\
+        async def fetch_users(db, limit=100, offset=0):
+            query = "SELECT * FROM users WHERE active = true LIMIT $1 OFFSET $2"
+            rows = await db.fetch(query, limit, offset)
+            return [User(**row) for row in rows]
+    """),
+    textwrap.dedent("""\
+        async def fetch_users(database, limit=100, offset=0):
+            query = "SELECT * FROM users WHERE active = TRUE LIMIT $1 OFFSET $2"
+            rows = await database.fetch(query, limit, offset)
+            return [User(**r) for r in rows]
+    """),
+)
+
+bench(
+    "Comment + whitespace + hallucination triple",
+    "hard",
+    textwrap.dedent("""\
+        class TokenBucket:
+            # Rate limiter using token bucket algorithm
+            def __init__(self, rate, capacity):
+                self.rate = rate
+                self.capacity = capacity
+                self.tokens = capacity
+                self.last_refill = time.monotonic()
+    """),
+    textwrap.dedent("""\
+        class TokenBucket:
+            # Token bucket rate limiter
+            def __init__(self, rate, capacity):
+                self.rate = rate
+                self.capacity = capacity
+                self.tokens = capacity
+                self.last_refill = time.monotonic()
+    """),
+)
+
+bench(
+    "Large block with scattered small diffs",
+    "hard",
+    textwrap.dedent("""\
+        def setup_logging(config):
+            level = getattr(logging, config.get('level', 'INFO'))
+            fmt = config.get('format', '%(asctime)s %(levelname)s %(message)s')
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter(fmt))
+            logger = logging.getLogger('myapp')
+            logger.setLevel(level)
+            logger.addHandler(handler)
+            if config.get('file'):
+                fh = logging.FileHandler(config['file'])
+                fh.setFormatter(logging.Formatter(fmt))
+                logger.addHandler(fh)
+            return logger
+    """),
+    textwrap.dedent("""\
+        def setup_logging(config):
+            level = getattr(logging, config.get("level", "INFO"))
+            fmt = config.get("format", "%(asctime)s %(levelname)s %(message)s")
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter(fmt))
+            logger = logging.getLogger("myapp")
+            logger.setLevel(level)
+            logger.addHandler(handler)
+            if config.get("file"):
+                fh = logging.FileHandler(config["file"])
+                fh.setFormatter(logging.Formatter(fmt))
+                logger.addHandler(fh)
+            return logger
+    """),
+)
+
+bench(
+    "Model compresses multiline to single line",
+    "hard",
+    "results = [\n    process(x)\n    for x in data\n    if x.valid\n]\n",
+    "results = [process(x) for x in data if x.valid]\n",
+)
+
+bench(
+    "Decorator order swapped + whitespace",
+    "hard",
+    "    @staticmethod\n    @lru_cache(maxsize=128)\n    def compute(x, y):\n        return expensive_op(x, y)\n",
+    "    @lru_cache(maxsize=128)\n    @staticmethod\n    def compute(x, y):\n        return expensive_op(x, y)\n",
+)
+
+bench(
+    "Model adds semicolons (JS→TS habit)",
+    "hallucination",
+    "const x = 1\nconst y = 2\nconst z = x + y\nconsole.log(z)\n",
+    "const x = 1;\nconst y = 2;\nconst z = x + y;\nconsole.log(z);\n",
+)
+
+bench(
+    "C: brace style K&R vs Allman",
+    "hallucination",
+    "int main() {\n    printf(\"hello\\n\");\n    return 0;\n}\n",
+    "int main()\n{\n    printf(\"hello\\n\");\n    return 0;\n}\n",
+)
+
+bench(
+    "Model expands abbreviated variable names",
+    "hallucination",
+    "for i, v in enumerate(vals):\n    res[i] = fn(v)\n",
+    "for index, value in enumerate(vals):\n    res[index] = fn(value)\n",
+)
+
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------

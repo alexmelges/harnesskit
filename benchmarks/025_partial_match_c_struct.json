@@ -1,0 +1,20 @@
+{
+  "name": "C struct partial match without typedef",
+  "category": "partial_match", 
+  "difficulty": 3,
+  "source": "C programming",
+  "description": "LLM matches struct definition but misses surrounding typedef",
+  "original": "typedef struct {\n    int id;\n    char name[64];\n    float salary;\n    int department_id;\n    time_t hire_date;\n} Employee;\n\ntypedef struct {\n    int id;\n    char name[32];\n    Employee* employees;\n    int employee_count;\n} Department;",
+  "llm_edit": {
+    "old_text": "struct {\n    int id;\n    char name[64];\n    float salary;\n    int department_id;\n    time_t hire_date;\n}",
+    "new_text": "struct {\n    int id;\n    char name[64];\n    char email[128];\n    float salary;\n    int department_id;\n    time_t hire_date;\n}"
+  },
+  "expected": "typedef struct {\n    int id;\n    char name[64];\n    char email[128];\n    float salary;\n    int department_id;\n    time_t hire_date;\n} Employee;\n\ntypedef struct {\n    int id;\n    char name[32];\n    Employee* employees;\n    int employee_count;\n} Department;",
+  "metadata": {
+    "model": "gpt-4o",
+    "tool": "c_editor",
+    "language": "c",
+    "common_pattern": true,
+    "failure_reason": "LLM matched only struct body without typedef and Employee alias"
+  }
+}

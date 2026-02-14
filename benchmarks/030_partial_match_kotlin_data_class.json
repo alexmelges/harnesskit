@@ -1,0 +1,20 @@
+{
+  "name": "Kotlin data class partial match missing annotations",
+  "category": "partial_match",
+  "difficulty": 3,
+  "source": "Android development", 
+  "description": "LLM matches data class but misses surrounding annotations and imports",
+  "original": "import kotlinx.serialization.Serializable\nimport kotlinx.serialization.SerialName\n\n@Serializable\n@Entity(tableName = \"users\")\ndata class User(\n    @SerialName(\"user_id\")\n    @PrimaryKey\n    val id: String,\n    \n    @SerialName(\"display_name\")\n    val name: String,\n    \n    @SerialName(\"email_address\")\n    val email: String,\n    \n    val isActive: Boolean = true,\n    val createdAt: Long = System.currentTimeMillis()\n)",
+  "llm_edit": {
+    "old_text": "data class User(\n    @SerialName(\"user_id\")\n    @PrimaryKey\n    val id: String,\n    \n    @SerialName(\"display_name\")\n    val name: String,\n    \n    @SerialName(\"email_address\")\n    val email: String,\n    \n    val isActive: Boolean = true,\n    val createdAt: Long = System.currentTimeMillis()\n)",
+    "new_text": "data class User(\n    @SerialName(\"user_id\")\n    @PrimaryKey\n    val id: String,\n    \n    @SerialName(\"display_name\")\n    val name: String,\n    \n    @SerialName(\"email_address\")\n    val email: String,\n    \n    val profilePicture: String? = null,\n    \n    val isActive: Boolean = true,\n    val createdAt: Long = System.currentTimeMillis()\n)"
+  },
+  "expected": "import kotlinx.serialization.Serializable\nimport kotlinx.serialization.SerialName\n\n@Serializable\n@Entity(tableName = \"users\")\ndata class User(\n    @SerialName(\"user_id\")\n    @PrimaryKey\n    val id: String,\n    \n    @SerialName(\"display_name\")\n    val name: String,\n    \n    @SerialName(\"email_address\")\n    val email: String,\n    \n    val profilePicture: String? = null,\n    \n    val isActive: Boolean = true,\n    val createdAt: Long = System.currentTimeMillis()\n)",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "kotlin_editor",
+    "language": "kotlin", 
+    "common_pattern": true,
+    "failure_reason": "LLM matched only data class definition without @Serializable and @Entity annotations"
+  }
+}

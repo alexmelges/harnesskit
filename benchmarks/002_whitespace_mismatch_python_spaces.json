@@ -1,0 +1,20 @@
+{
+  "name": "Python function with extra whitespace",
+  "category": "whitespace_mismatch", 
+  "difficulty": 1,
+  "source": "Common Claude Code failure pattern",
+  "description": "LLM adds extra spaces around operators when trying to fix a function",
+  "original": "def calculate_total(price, tax_rate):\n    return price * (1 + tax_rate)",
+  "llm_edit": {
+    "old_text": "def calculate_total(price, tax_rate):\n    return price*(1+tax_rate)",
+    "new_text": "def calculate_total(price, tax_rate, discount=0.0):\n    return price*(1+tax_rate)*(1-discount)"
+  },
+  "expected": "def calculate_total(price, tax_rate, discount=0.0):\n    return price * (1 + tax_rate) * (1 - discount)",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "cursor",
+    "language": "python",
+    "common_pattern": true,
+    "failure_reason": "LLM removed spaces around operators in search pattern"
+  }
+}
