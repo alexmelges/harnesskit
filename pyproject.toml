@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harnesskit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fuzzy edit tool for LLM coding agents — never fail a str_replace again"
 readme = "README.md"
 license = "MIT"
@@ -25,6 +25,10 @@ Repository = "https://github.com/alexmelges/harnesskit"
 
 [project.scripts]
 hk = "hk:main"
+hk-mcp = "hk_mcp:run_stdio"
 
 [tool.setuptools]
-py-modules = ["hk"]
+py-modules = ["hk", "hk_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["."]

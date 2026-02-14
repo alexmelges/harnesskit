@@ -96,6 +96,58 @@ Batch multiple edits:
 | `1`  | No match found |
 | `2`  | Ambiguous — multiple matches |
 
+## MCP Server
+
+HarnessKit ships an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for plug-and-play integration with any MCP-compatible agent.
+
+### Quick Start
+
+Add to your MCP client config (e.g. Claude Desktop, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "harnesskit": {
+      "command": "python3",
+      "args": ["/path/to/hk_mcp.py"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `harnesskit_apply` | Apply a fuzzy edit to a file |
+| `harnesskit_apply_batch` | Apply multiple edits in one call |
+| `harnesskit_match` | Preview the match without modifying (dry run) |
+
+Each tool returns the match type, confidence score, and matched text — giving the agent full visibility into how the edit was resolved.
+
+### Example
+
+```json
+{
+  "name": "harnesskit_apply",
+  "arguments": {
+    "file": "app.py",
+    "old_text": "def hello():\n    print('hi')",
+    "new_text": "def hello():\n    print('hello world')",
+    "threshold": 0.8
+  }
+}
+```
+
+Response:
+```json
+{
+  "status": "applied",
+  "match_type": "whitespace",
+  "confidence": 0.95
+}
+```
+
 ## Integration
 
 HarnessKit is designed to slot into any agent framework as the edit backend:
@@ -162,7 +214,7 @@ python3 benchmarks/benchmark.py
 ```bash
 git clone https://github.com/alexmelges/harnesskit.git
 cd harnesskit
-python3 test_hk.py  # 39 tests, stdlib unittest
+python3 -m pytest test_hk.py test_mcp.py -v  # 53 tests
 ```
 
 ## License
