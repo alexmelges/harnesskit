@@ -59,8 +59,8 @@ def run_harnesskit(original: str, old_text: str, new_text: str, hk_path: str) ->
     import time
     start_time = time.time()
     
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.tmp') as tmp_file:
-        tmp_file.write(original)
+    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.tmp') as tmp_file:
+        tmp_file.write(original.encode('utf-8'))
         tmp_file_path = tmp_file.name
     
     try:
@@ -81,9 +81,9 @@ def run_harnesskit(original: str, old_text: str, new_text: str, hk_path: str) ->
         if result.returncode == 0:
             output = json.loads(result.stdout)
             
-            # Read the modified file to compare with expected
-            with open(tmp_file_path, 'r') as f:
-                actual_content = f.read()
+            # Read the modified file to compare with expected (binary to preserve line endings)
+            with open(tmp_file_path, 'rb') as f:
+                actual_content = f.read().decode('utf-8')
             
             return {
                 "success": output.get("status") == "applied",

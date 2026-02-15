@@ -656,5 +656,86 @@ class TestValidateCommand(unittest.TestCase):
         self.assertEqual(exit_code, 1)
 
 
+class TestCRLFHandling(unittest.TestCase):
+    """Test CRLF line ending preservation."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_crlf_preserved(self):
+        """CRLF files should maintain CRLF after edits."""
+        f = os.path.join(self.tmpdir, "test.sh")
+        with open(f, 'wb') as fh:
+            fh.write(b"line1\r\nline2\r\nline3\r\n")
+        result = hk.apply_edit(f, "line2", "replaced")
+        self.assertEqual(result.status, "applied")
+        with open(f, 'rb') as fh:
+            content = fh.read()
+        self.assertIn(b"\r\n", content)
+        self.assertEqual(content, b"line1\r\nreplaced\r\nline3\r\n")
+
+    def test_lf_not_converted(self):
+        """LF files should stay LF."""
+        f = os.path.join(self.tmpdir, "test.sh")
+        with open(f, 'wb') as fh:
+            fh.write(b"line1\nline2\nline3\n")
+        result = hk.apply_edit(f, "line2", "replaced")
+        self.assertEqual(result.status, "applied")
+        with open(f, 'rb') as fh:
+            content = fh.read()
+        self.assertNotIn(b"\r\n", content)
+
+
+class TestTabSpaceMapping(unittest.TestCase):
+    """Test tabs-to-spaces and spaces-to-tabs indent mapping."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_spaces_to_tabs(self):
+        """File uses tabs, edit uses spaces — should convert."""
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("class Foo:\n\tdef bar(self):\n\t\treturn 1\n")
+        result = hk.apply_edit(f, "class Foo:\n    def bar(self):\n        return 1",
+                                   "class Foo:\n    def bar(self):\n        return 2")
+        self.assertEqual(result.status, "applied")
+        with open(f, 'r') as fh:
+            content = fh.read()
+        self.assertIn("\treturn 2", content)
+
+
+class TestCSSTokenMapping(unittest.TestCase):
+    """Test hyphenated token mapping (CSS class renames)."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_css_class_rename(self):
+        """Stale CSS class names should be mapped to actual names."""
+        f = os.path.join(self.tmpdir, "test.css")
+        with open(f, 'w') as fh:
+            fh.write(".my-card {\n    color: red;\n}\n")
+        result = hk.apply_edit(f, ".card {\n    color: red;\n}",
+                                   ".card {\n    color: blue;\n}")
+        self.assertEqual(result.status, "applied")
+        with open(f, 'r') as fh:
+            content = fh.read()
+        self.assertIn(".my-card", content)
+        self.assertIn("blue", content)
+
+
 if __name__ == "__main__":
     unittest.main()

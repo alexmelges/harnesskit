@@ -182,10 +182,15 @@ def find_line_fuzzy_matches(
 
     for start_line in range(0, len(content_lines) - n_old + 1):
         block = content_lines[start_line:start_line + n_old]
-        # Compare line by line
+        # Compare line by line (try both raw and indent-normalized)
         total = 0.0
         for ol, cl in zip(old_lines, block):
-            total += difflib.SequenceMatcher(None, ol, cl).ratio()
+            raw_ratio = difflib.SequenceMatcher(None, ol, cl).ratio()
+            # Also try with tabs expanded to spaces (handles tabs-vs-spaces)
+            ol_norm = ol.expandtabs(4)
+            cl_norm = cl.expandtabs(4)
+            norm_ratio = difflib.SequenceMatcher(None, ol_norm, cl_norm).ratio()
+            total += max(raw_ratio, norm_ratio)
         avg = total / n_old
 
         if avg > best_score:
@@ -259,8 +264,12 @@ class AmbiguousMatchError(Exception):
 
 
 def _get_line_indent(line: str) -> str:
-    """Return the leading whitespace of a line."""
-    return line[:len(line) - len(line.lstrip())]
+    """Return the leading whitespace of a line (excluding newline chars)."""
+    stripped = line.lstrip()
+    if not stripped:
+        # Whitespace-only line: return everything except trailing newline(s)
+        return line.rstrip('\n\r')
+    return line[:len(line) - len(stripped)]
 
 
 def _detect_indent_mapping(old_text: str, matched_text: str) -> Optional[dict]:
@@ -294,7 +303,7 @@ def _apply_indent_mapping(text: str, mapping: dict) -> str:
     result = []
     for line in lines:
         indent = _get_line_indent(line)
-        content = line.lstrip()
+        content = line[len(indent):]  # Preserve newline chars (don't use lstrip)
         if indent in mapping:
             result.append(mapping[indent] + content)
         else:
@@ -649,9 +658,9 @@ def _build_token_mapping(old_text: str, matched_text: str) -> dict:
 
 def _extract_token_diffs(old_line: str, matched_line: str, mapping: dict):
     """Extract token-level differences between two lines."""
-    # Use word-level tokenization
-    old_tokens = re.findall(r'[\w.]+|[^\w\s]+|\s+', old_line)
-    matched_tokens = re.findall(r'[\w.]+|[^\w\s]+|\s+', matched_line)
+    # Use word-level tokenization (include hyphens for CSS-style identifiers)
+    old_tokens = re.findall(r'[\w.\-]+|[^\w\s\-]+|\s+', old_line)
+    matched_tokens = re.findall(r'[\w.\-]+|[^\w\s\-]+|\s+', matched_line)
 
     sm = difflib.SequenceMatcher(None, old_tokens, matched_tokens)
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
@@ -659,8 +668,8 @@ def _extract_token_diffs(old_line: str, matched_line: str, mapping: dict):
             old_chunk = ''.join(old_tokens[i1:i2]).strip()
             matched_chunk = ''.join(matched_tokens[j1:j2]).strip()
             if old_chunk and matched_chunk and old_chunk != matched_chunk:
-                # Only map identifier-like tokens
-                if re.match(r'^[\w.]+$', old_chunk) and re.match(r'^[\w.]+$', matched_chunk):
+                # Map identifier-like tokens (including hyphenated like CSS classes)
+                if re.match(r'^[\w.\-]+$', old_chunk) and re.match(r'^[\w.\-]+$', matched_chunk):
                     mapping[old_chunk] = matched_chunk
 
 
@@ -676,8 +685,8 @@ def _apply_token_mapping(text: str, mapping: dict) -> str:
         # Check if it's not already replaced by checking what follows
         pattern = re.escape(old_tok) + r'(?!' + re.escape(new_tok[len(old_tok):]) + r')' if new_tok.startswith(old_tok) else re.escape(old_tok)
         # Ensure we don't match in the middle of a longer identifier
-        # But allow matching at word/dot boundaries
-        pattern = r'(?<!\w)' + pattern + r'(?=\W|$)'
+        # But allow matching at word/dot/hyphen boundaries
+        pattern = r'(?<![\w\-])' + pattern + r'(?=[\W]|$)'
         text = re.sub(pattern, new_tok, text)
     return text
 
@@ -935,8 +944,9 @@ def apply_edit(
 ) -> EditResult:
     """Apply a single edit to a file."""
     try:
-        with open(file_path, 'r') as f:
-            content = f.read()
+        with open(file_path, 'rb') as f:
+            raw_bytes = f.read()
+        content = raw_bytes.decode('utf-8', errors='replace')
     except FileNotFoundError:
         return EditResult(
             status="error",
@@ -950,11 +960,13 @@ def apply_edit(
             error=str(e),
         )
 
-    # Normalize line endings for matching, preserve original for output
+    # Detect CRLF before normalizing
+    use_crlf = b'\r\n' in raw_bytes
+
+    # Normalize line endings for matching
     content_normalized = content.replace('\r\n', '\n')
     old_normalized = old_text.replace('\r\n', '\n')
     new_normalized = new_text.replace('\r\n', '\n')
-    use_crlf = '\r\n' in content and '\r\n' not in content_normalized  # always false after replace
 
     try:
         match = find_best_match(content_normalized, old_normalized, threshold)
@@ -982,7 +994,7 @@ def apply_edit(
     new_content = content_normalized[:match.start] + adapted_new + content_normalized[match.end:]
 
     # Restore original line endings if file used CRLF
-    if '\r\n' in content:
+    if use_crlf:
         new_content = new_content.replace('\n', '\r\n')
 
     # Compute diff
@@ -1004,8 +1016,12 @@ def apply_edit(
             )
 
     if not dry_run:
-        with open(file_path, 'w') as f:
-            f.write(new_content)
+        if use_crlf:
+            with open(file_path, 'wb') as f:
+                f.write(new_content.encode('utf-8'))
+        else:
+            with open(file_path, 'w') as f:
+                f.write(new_content)
 
     result = EditResult(
         status="applied",
