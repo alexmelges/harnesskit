@@ -254,6 +254,541 @@ class AmbiguousMatchError(Exception):
         super().__init__(f"Found {len(matches)} ambiguous matches")
 
 
+def _get_line_indent(line: str) -> str:
+    """Return the leading whitespace of a line."""
+    return line[:len(line) - len(line.lstrip())]
+
+
+def _detect_indent_mapping(old_text: str, matched_text: str) -> Optional[dict]:
+    """Detect systematic indentation differences between old_text and matched_text.
+
+    Returns a dict mapping old_indent -> new_indent, or None if no consistent mapping.
+    """
+    old_lines = old_text.splitlines()
+    matched_lines = matched_text.splitlines()
+
+    if len(old_lines) != len(matched_lines):
+        return None
+
+    mapping = {}
+    for ol, ml in zip(old_lines, matched_lines):
+        oi = _get_line_indent(ol)
+        mi = _get_line_indent(ml)
+        if ol.strip() == ml.strip():  # Same content, different indent
+            if oi in mapping:
+                if mapping[oi] != mi:
+                    return None  # Inconsistent
+            else:
+                mapping[oi] = mi
+
+    return mapping if mapping else None
+
+
+def _apply_indent_mapping(text: str, mapping: dict) -> str:
+    """Apply an indentation mapping to text."""
+    lines = text.splitlines(keepends=True)
+    result = []
+    for line in lines:
+        indent = _get_line_indent(line)
+        content = line.lstrip()
+        if indent in mapping:
+            result.append(mapping[indent] + content)
+        else:
+            # Try to find best matching indent by prefix
+            best_old = ''
+            for old_indent in mapping:
+                if indent.startswith(old_indent) and len(old_indent) > len(best_old):
+                    best_old = old_indent
+            if best_old:
+                extra = indent[len(best_old):]
+                # Scale extra indent too
+                if best_old and mapping[best_old]:
+                    # Detect indent unit ratio
+                    old_unit = len(best_old) if best_old else 1
+                    new_unit = len(mapping[best_old])
+                    if old_unit > 0:
+                        scaled_extra_len = int(len(extra) * new_unit / old_unit)
+                        indent_char = mapping[best_old][0] if mapping[best_old] else ' '
+                        result.append(mapping[best_old] + indent_char * scaled_extra_len + content)
+                    else:
+                        result.append(mapping[best_old] + extra + content)
+                else:
+                    result.append(mapping[best_old] + extra + content)
+            else:
+                result.append(line)
+    return ''.join(result)
+
+
+def _adapt_replacement(old_text: str, new_text: str, matched_text: str, match_type: str) -> str:
+    """Adapt new_text based on differences between old_text and matched_text.
+
+    For whitespace/indentation matches: re-indent new_text to match actual file style.
+    For fuzzy/stale context matches: apply the edit *diff* to the matched region.
+    """
+    if match_type == "exact":
+        return new_text
+
+    # Strategy 1: Indentation mapping (for whitespace/indentation drift)
+    if match_type in ("whitespace", "line_fuzzy"):
+        mapping = _detect_indent_mapping(old_text, matched_text)
+        if mapping:
+            # Only use indent mapping if it actually changes something
+            adapted = _apply_indent_mapping(new_text, mapping)
+            if adapted != new_text:
+                return adapted
+
+    # Strategy 2: Line-ending adaptation
+    if '\r\n' in matched_text and '\r\n' not in new_text:
+        new_text = new_text.replace('\n', '\r\n')
+    elif '\r\n' not in matched_text and '\r\n' in new_text:
+        new_text = new_text.replace('\r\n', '\n')
+
+    # Strategy 3: Diff-based edit for fuzzy matches (stale context)
+    if match_type in ("fuzzy", "line_fuzzy"):
+        adapted = _apply_diff_based_edit(old_text, new_text, matched_text)
+        if adapted is not None:
+            return adapted
+
+    # Strategy 4: For whitespace matches where indent mapping didn't work,
+    # try line-by-line whitespace transfer
+    if match_type == "whitespace":
+        adapted = _transfer_line_whitespace(old_text, new_text, matched_text)
+        if adapted is not None:
+            return adapted
+        # Fall back to diff-based
+        adapted = _apply_diff_based_edit(old_text, new_text, matched_text)
+        if adapted is not None:
+            return adapted
+
+    return new_text
+
+
+def _detect_trailing_ws_pattern(old_lines: List[str], matched_lines: List[str]) -> Optional[str]:
+    """Detect if matched lines consistently add trailing whitespace that old lines lack."""
+    trailing = None
+    for ol, ml in zip(old_lines, matched_lines):
+        ol_content = ol.rstrip('\n\r')
+        ml_content = ml.rstrip('\n\r')
+        ol_stripped = ol_content.rstrip()
+        ml_stripped = ml_content.rstrip()
+        if ol_stripped == ml_stripped or normalize_whitespace(ol) == normalize_whitespace(ml):
+            ol_trail = ol_content[len(ol_stripped):]
+            ml_trail = ml_content[len(ml_stripped):]
+            if ml_trail and not ol_trail:
+                if trailing is None:
+                    trailing = ml_trail
+                elif trailing != ml_trail:
+                    return None  # Inconsistent
+    return trailing
+
+
+def _apply_trailing_ws(line: str, pattern: Optional[str]) -> str:
+    """Apply trailing whitespace pattern to a line."""
+    if pattern is None:
+        return line
+    content = line.rstrip('\n\r')
+    ending = line[len(content):]
+    stripped = content.rstrip()
+    # Only add trailing ws if the line doesn't already have it
+    if content == stripped:  # No trailing ws currently
+        return stripped + pattern + ending
+    return line
+
+
+def _transfer_line_whitespace(old_text: str, new_text: str, matched_text: str) -> Optional[str]:
+    """Transfer whitespace patterns from matched_text to new_text line by line.
+
+    For lines that are the same between old_text and new_text (unchanged),
+    use the matched_text version. For changed/new lines, try to infer
+    whitespace patterns from the matched context.
+    """
+    old_lines = old_text.splitlines(keepends=True)
+    new_lines = new_text.splitlines(keepends=True)
+    matched_lines = matched_text.splitlines(keepends=True)
+
+    if len(old_lines) != len(matched_lines):
+        return None
+
+    # Detect trailing whitespace pattern from matched lines
+    trailing_ws_pattern = _detect_trailing_ws_pattern(old_lines, matched_lines)
+
+    # Build maps
+    ws_stripped_to_matched = {}  # whitespace-stripped content -> matched line
+    old_to_matched_line = {}  # old line index -> matched line
+    for i, (ol, ml) in enumerate(zip(old_lines, matched_lines)):
+        ws_stripped_to_matched[normalize_whitespace(ol)] = ml
+        old_to_matched_line[i] = ml
+
+    # Use SequenceMatcher to align old and new lines
+    sm = difflib.SequenceMatcher(None, old_lines, new_lines)
+    result = []
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == 'equal':
+            # Unchanged lines: use matched version
+            for i in range(i1, i2):
+                result.append(old_to_matched_line.get(i, old_lines[i]))
+        elif tag == 'replace':
+            for j in range(j1, j2):
+                nl = new_lines[j]
+                ws_key = normalize_whitespace(nl)
+                if ws_key in ws_stripped_to_matched:
+                    result.append(ws_stripped_to_matched[ws_key])
+                else:
+                    # Try to adapt: find the corresponding old line and
+                    # apply intra-line whitespace transfer
+                    old_idx = i1 + (j - j1) if (i1 + (j - j1)) < i2 else None
+                    if old_idx is not None and old_idx in old_to_matched_line:
+                        adapted = _adapt_line_whitespace(
+                            old_lines[old_idx], nl, old_to_matched_line[old_idx]
+                        )
+                        result.append(adapted)
+                    else:
+                        # Adapt indentation at least
+                        if i1 < len(old_lines) and i1 in old_to_matched_line:
+                            oi = _get_line_indent(old_lines[i1])
+                            mi = _get_line_indent(old_to_matched_line[i1])
+                            ni = _get_line_indent(nl)
+                            if ni == oi and oi != mi:
+                                nl = mi + nl.lstrip()
+                        nl = _apply_trailing_ws(nl, trailing_ws_pattern)
+                        result.append(nl)
+        elif tag == 'insert':
+            for j in range(j1, j2):
+                nl = new_lines[j]
+                ws_key = normalize_whitespace(nl)
+                if ws_key in ws_stripped_to_matched:
+                    result.append(ws_stripped_to_matched[ws_key])
+                else:
+                    # Adapt indentation from context
+                    if i1 > 0 and (i1 - 1) in old_to_matched_line:
+                        oi = _get_line_indent(old_lines[i1 - 1])
+                        mi = _get_line_indent(old_to_matched_line[i1 - 1])
+                        ni = _get_line_indent(nl)
+                        if ni == oi and oi != mi:
+                            nl = mi + nl.lstrip()
+                    # Apply trailing whitespace pattern
+                    nl = _apply_trailing_ws(nl, trailing_ws_pattern)
+                    result.append(nl)
+        # delete: skip
+
+    return ''.join(result)
+
+
+def _adapt_line_whitespace(old_line: str, new_line: str, matched_line: str) -> str:
+    """Adapt a changed line's whitespace based on old->matched mapping.
+
+    Given: old_line (what LLM thought), new_line (what LLM wants),
+    matched_line (what's actually in the file).
+
+    Find what changed content-wise between old and new, and apply
+    that change to the matched line.
+    """
+    # First adapt indentation
+    old_indent = _get_line_indent(old_line)
+    matched_indent = _get_line_indent(matched_line)
+    new_indent = _get_line_indent(new_line)
+
+    # Use matched indentation if new matches old
+    if new_indent == old_indent:
+        base_indent = matched_indent
+    else:
+        base_indent = new_indent
+
+    # Try to apply content diff within the line
+    old_stripped = old_line.strip()
+    new_stripped = new_line.strip()
+    matched_stripped = matched_line.strip()
+
+    # If the whitespace-normalized versions of old and matched are the same,
+    # apply a character-level patch
+    if normalize_whitespace(old_stripped) == normalize_whitespace(matched_stripped):
+        # The only difference is internal whitespace.
+        # Find what content was added/changed in new vs old, apply to matched
+        sm = difflib.SequenceMatcher(None, old_stripped, new_stripped)
+        result_chars = []
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag == 'equal':
+                # Use matched version of this segment
+                # Map positions from old_stripped to matched_stripped
+                result_chars.append(_map_segment(old_stripped, matched_stripped, i1, i2))
+            elif tag == 'replace':
+                result_chars.append(new_stripped[j1:j2])
+            elif tag == 'insert':
+                result_chars.append(new_stripped[j1:j2])
+            # delete: skip
+        adapted_content = ''.join(result_chars)
+        ending = new_line[len(new_line.rstrip()):]  # preserve line ending
+        return base_indent + adapted_content + ending
+
+    return base_indent + new_stripped + new_line[len(new_line.rstrip()):]
+
+
+def _map_segment(old_str: str, matched_str: str, start: int, end: int) -> str:
+    """Map a segment from old_str positions to the corresponding matched_str positions.
+
+    Uses character-level alignment between old and matched strings.
+    """
+    sm = difflib.SequenceMatcher(None, old_str, matched_str)
+    # Find where old[start:end] maps to in matched
+    matched_start = None
+    matched_end = None
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag in ('equal', 'replace'):
+            # Check overlap with [start, end)
+            overlap_start = max(i1, start)
+            overlap_end = min(i2, end)
+            if overlap_start < overlap_end:
+                # Map proportionally
+                if i2 > i1:
+                    ratio_start = (overlap_start - i1) / (i2 - i1)
+                    ratio_end = (overlap_end - i1) / (i2 - i1)
+                    ms = j1 + int(ratio_start * (j2 - j1))
+                    me = j1 + int(ratio_end * (j2 - j1))
+                else:
+                    ms = j1
+                    me = j2
+                if matched_start is None:
+                    matched_start = ms
+                matched_end = me
+
+    if matched_start is not None and matched_end is not None:
+        return matched_str[matched_start:matched_end]
+    return old_str[start:end]
+
+
+def _apply_line_change(old_line: str, new_line: str, matched_line: str) -> str:
+    """Apply the change from old_line->new_line onto matched_line.
+
+    If old_line and matched_line differ (stale context), apply the
+    character-level diff from old->new onto matched.
+    """
+    # If old matches matched, just use new
+    if old_line.strip() == matched_line.strip():
+        # Preserve matched indentation
+        mi = _get_line_indent(matched_line)
+        ni = _get_line_indent(new_line)
+        oi = _get_line_indent(old_line)
+        if ni == oi:
+            return mi + new_line.lstrip()
+        return new_line
+
+    # old and matched differ: apply old->new diff onto matched
+    old_s = old_line.rstrip('\n\r')
+    new_s = new_line.rstrip('\n\r')
+    matched_s = matched_line.rstrip('\n\r')
+    ending = matched_line[len(matched_s):]
+
+    sm_on = difflib.SequenceMatcher(None, old_s, new_s)
+    # Align old to matched
+    sm_om = difflib.SequenceMatcher(None, old_s, matched_s)
+
+    # Build position map: old char index -> matched char index
+    old_to_m_pos = {}
+    for tag, i1, i2, j1, j2 in sm_om.get_opcodes():
+        if tag == 'equal':
+            for k in range(i2 - i1):
+                old_to_m_pos[i1 + k] = j1 + k
+        elif tag == 'replace':
+            # Approximate mapping
+            old_len = i2 - i1
+            m_len = j2 - j1
+            for k in range(old_len):
+                mk = j1 + int(k * m_len / old_len) if old_len > 0 else j1
+                old_to_m_pos[i1 + k] = mk
+
+    # Apply old->new opcodes but using matched content for 'equal' parts
+    result_chars = []
+    for tag, i1, i2, j1, j2 in sm_on.get_opcodes():
+        if tag == 'equal':
+            # Use matched version of these characters
+            m_start = old_to_m_pos.get(i1)
+            m_end = old_to_m_pos.get(i2 - 1)
+            if m_start is not None and m_end is not None:
+                result_chars.append(matched_s[m_start:m_end + 1])
+            else:
+                result_chars.append(old_s[i1:i2])
+        elif tag == 'replace':
+            result_chars.append(new_s[j1:j2])
+        elif tag == 'insert':
+            result_chars.append(new_s[j1:j2])
+        # delete: skip
+
+    return ''.join(result_chars) + ending
+
+
+def _build_token_mapping(old_text: str, matched_text: str) -> dict:
+    """Build a mapping of tokens that differ between old_text and matched_text.
+
+    This captures variable renames and other identifier changes so we can
+    adapt new_text to use the actual file's identifiers.
+    """
+    old_lines = old_text.splitlines()
+    matched_lines = matched_text.splitlines()
+
+    # Align lines
+    sm = difflib.SequenceMatcher(None, old_lines, matched_lines)
+    token_map = {}
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == 'replace' and (i2 - i1) == (j2 - j1):
+            for k in range(i2 - i1):
+                ol = old_lines[i1 + k].strip()
+                ml = matched_lines[j1 + k].strip()
+                if ol != ml:
+                    # Find differing tokens
+                    _extract_token_diffs(ol, ml, token_map)
+
+    return token_map
+
+
+def _extract_token_diffs(old_line: str, matched_line: str, mapping: dict):
+    """Extract token-level differences between two lines."""
+    # Use word-level tokenization
+    old_tokens = re.findall(r'[\w.]+|[^\w\s]+|\s+', old_line)
+    matched_tokens = re.findall(r'[\w.]+|[^\w\s]+|\s+', matched_line)
+
+    sm = difflib.SequenceMatcher(None, old_tokens, matched_tokens)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == 'replace':
+            old_chunk = ''.join(old_tokens[i1:i2]).strip()
+            matched_chunk = ''.join(matched_tokens[j1:j2]).strip()
+            if old_chunk and matched_chunk and old_chunk != matched_chunk:
+                # Only map identifier-like tokens
+                if re.match(r'^[\w.]+$', old_chunk) and re.match(r'^[\w.]+$', matched_chunk):
+                    mapping[old_chunk] = matched_chunk
+
+
+def _apply_token_mapping(text: str, mapping: dict) -> str:
+    """Apply token mapping to text, replacing old identifiers with actual ones."""
+    if not mapping:
+        return text
+    # Sort by length (longest first) to avoid partial replacements
+    for old_tok, new_tok in sorted(mapping.items(), key=lambda x: -len(x[0])):
+        # Replace exact occurrences — use word boundary aware replacement
+        # For dotted identifiers like self.db -> self.db_conn,
+        # we need to match self.db but not when it's already self.db_conn
+        # Check if it's not already replaced by checking what follows
+        pattern = re.escape(old_tok) + r'(?!' + re.escape(new_tok[len(old_tok):]) + r')' if new_tok.startswith(old_tok) else re.escape(old_tok)
+        # Ensure we don't match in the middle of a longer identifier
+        # But allow matching at word/dot boundaries
+        pattern = r'(?<!\w)' + pattern + r'(?=\W|$)'
+        text = re.sub(pattern, new_tok, text)
+    return text
+
+
+def _apply_diff_based_edit(old_text: str, new_text: str, matched_text: str) -> Optional[str]:
+    """Apply the conceptual diff between old_text and new_text to matched_text.
+
+    This handles stale context: old_text doesn't exactly match matched_text,
+    but the structural edit (additions/removals) should still apply.
+    """
+    # Build token mapping for stale context adaptation
+    token_map = _build_token_mapping(old_text, matched_text)
+
+    old_lines = old_text.splitlines(keepends=True)
+    new_lines = new_text.splitlines(keepends=True)
+    matched_lines = matched_text.splitlines(keepends=True)
+
+    if not old_lines or not new_lines or not matched_lines:
+        return None
+
+    # Ensure trailing newlines are consistent for difflib
+    if old_lines and not old_lines[-1].endswith('\n'):
+        old_lines[-1] += '\n'
+    if new_lines and not new_lines[-1].endswith('\n'):
+        new_lines[-1] += '\n'
+    if matched_lines and not matched_lines[-1].endswith('\n'):
+        matched_lines[-1] += '\n'
+
+    # Use SequenceMatcher to get opcodes between old and new
+    sm = difflib.SequenceMatcher(None, old_lines, new_lines)
+    opcodes = sm.get_opcodes()
+
+    # Also align old_lines to matched_lines
+    sm2 = difflib.SequenceMatcher(None, old_lines, matched_lines)
+    old_to_matched = {}  # old line index -> matched line index
+    for tag, i1, i2, j1, j2 in sm2.get_opcodes():
+        if tag == 'equal':
+            for k in range(i2 - i1):
+                old_to_matched[i1 + k] = j1 + k
+        elif tag == 'replace':
+            for k in range(min(i2 - i1, j2 - j1)):
+                old_to_matched[i1 + k] = j1 + k
+
+    # Apply the old->new opcodes, but using matched_lines instead of old_lines
+    result = []
+    for tag, i1, i2, j1, j2 in opcodes:
+        if tag == 'equal':
+            # Use matched version of these lines (preserves actual file content)
+            for i in range(i1, i2):
+                if i in old_to_matched:
+                    idx = old_to_matched[i]
+                    if idx < len(matched_lines):
+                        result.append(matched_lines[idx])
+                        continue
+                result.append(old_lines[i])
+        elif tag == 'replace':
+            # Lines changed: apply the change onto matched lines
+            old_chunk = old_lines[i1:i2]
+            new_chunk = new_lines[j1:j2]
+            matched_chunk = []
+            for i in range(i1, i2):
+                if i in old_to_matched and old_to_matched[i] < len(matched_lines):
+                    matched_chunk.append(matched_lines[old_to_matched[i]])
+                else:
+                    matched_chunk.append(old_lines[i])
+
+            # For 1:1 replacements, adapt each line
+            if len(old_chunk) == len(new_chunk) == len(matched_chunk):
+                for oc, nc, mc in zip(old_chunk, new_chunk, matched_chunk):
+                    adapted = _apply_line_change(oc, nc, mc)
+                    adapted = _apply_token_mapping(adapted, token_map)
+                    result.append(adapted)
+            else:
+                # Different line counts: use new lines with indent/token adaptation
+                for j in range(j1, j2):
+                    new_line = _apply_token_mapping(new_lines[j], token_map)
+                    old_idx = i1 + (j - j1) if (i1 + (j - j1)) < i2 else i1
+                    if old_idx in old_to_matched:
+                        midx = old_to_matched[old_idx]
+                        if midx < len(matched_lines):
+                            old_indent = _get_line_indent(old_lines[old_idx])
+                            matched_indent = _get_line_indent(matched_lines[midx])
+                            new_indent = _get_line_indent(new_line)
+                            if new_indent == old_indent and old_indent != matched_indent:
+                                new_line = matched_indent + new_line.lstrip()
+                    result.append(new_line)
+        elif tag == 'insert':
+            # New lines being added: adapt indentation and tokens
+            for j in range(j1, j2):
+                new_line = _apply_token_mapping(new_lines[j], token_map)
+                # Use surrounding context for indentation hints
+                if i1 > 0 and (i1 - 1) in old_to_matched:
+                    prev_old_indent = _get_line_indent(old_lines[i1 - 1])
+                    prev_matched_indent = _get_line_indent(
+                        matched_lines[old_to_matched[i1 - 1]]
+                    ) if old_to_matched[i1 - 1] < len(matched_lines) else prev_old_indent
+                    new_indent = _get_line_indent(new_line)
+                    if prev_old_indent != prev_matched_indent:
+                        # There's an indent shift; try to apply it
+                        if new_indent.startswith(prev_old_indent):
+                            extra = new_indent[len(prev_old_indent):]
+                            new_line = prev_matched_indent + extra + new_line.lstrip()
+                result.append(new_line)
+        elif tag == 'delete':
+            # Lines removed — skip them
+            pass
+
+    result_text = ''.join(result)
+    # Remove trailing newline we may have added
+    if not matched_text.endswith('\n') and result_text.endswith('\n'):
+        result_text = result_text[:-1]
+
+    return result_text
+
+
 def apply_edit(
     file_path: str,
     old_text: str,
@@ -278,8 +813,14 @@ def apply_edit(
             error=str(e),
         )
 
+    # Normalize line endings for matching, preserve original for output
+    content_normalized = content.replace('\r\n', '\n')
+    old_normalized = old_text.replace('\r\n', '\n')
+    new_normalized = new_text.replace('\r\n', '\n')
+    use_crlf = '\r\n' in content and '\r\n' not in content_normalized  # always false after replace
+
     try:
-        match = find_best_match(content, old_text, threshold)
+        match = find_best_match(content_normalized, old_normalized, threshold)
     except AmbiguousMatchError as e:
         return EditResult(
             status="ambiguous",
@@ -296,7 +837,16 @@ def apply_edit(
             error="No match found above threshold",
         )
 
-    new_content = content[:match.start] + new_text + content[match.end:]
+    # Adapt replacement text based on match type
+    adapted_new = _adapt_replacement(
+        old_normalized, new_normalized, match.matched_text, match.match_type
+    )
+
+    new_content = content_normalized[:match.start] + adapted_new + content_normalized[match.end:]
+
+    # Restore original line endings if file used CRLF
+    if '\r\n' in content:
+        new_content = new_content.replace('\n', '\r\n')
 
     if not dry_run:
         with open(file_path, 'w') as f:

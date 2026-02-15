@@ -39,7 +39,7 @@ class CategoryStats:
 def load_test_cases(benchmark_dir: str) -> List[Dict[str, Any]]:
     """Load all benchmark test cases from JSON files."""
     test_cases = []
-    json_files = glob.glob(os.path.join(benchmark_dir, "*.json"))
+    json_files = glob.glob(os.path.join(benchmark_dir, "[0-9]*.json"))
     
     for file_path in sorted(json_files):
         try:
