@@ -17,9 +17,11 @@ Exit codes: 0=applied, 1=no match found, 2=ambiguous (multiple matches)
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
-from dataclasses import dataclass
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 
@@ -34,12 +36,14 @@ class MatchResult:
 
 @dataclass
 class EditResult:
-    status: str  # "applied", "no_match", "ambiguous", "error"
+    status: str  # "applied", "no_match", "ambiguous", "error", "validation_error"
     file: str
     match_type: Optional[str] = None
     confidence: Optional[float] = None
     matched_text: Optional[str] = None
     error: Optional[str] = None
+    validated: Optional[bool] = None
+    diff: Optional[str] = None
 
 
 def normalize_whitespace(text: str) -> str:
@@ -789,12 +793,145 @@ def _apply_diff_based_edit(old_text: str, new_text: str, matched_text: str) -> O
     return result_text
 
 
+def validate_syntax(file_path: str, content: str) -> Tuple[bool, Optional[str]]:
+    """Validate syntax of content based on file extension.
+
+    Returns (valid, error_message). If valid is True, error_message is None.
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == '.py':
+        try:
+            compile(content, file_path, 'exec')
+            return True, None
+        except SyntaxError as e:
+            return False, f"Python syntax error: {e}"
+
+    elif ext == '.json':
+        try:
+            json.loads(content)
+            return True, None
+        except (json.JSONDecodeError, ValueError) as e:
+            return False, f"JSON syntax error: {e}"
+
+    elif ext in ('.xml', '.html', '.htm'):
+        try:
+            ET.fromstring(content)
+            return True, None
+        except ET.ParseError as e:
+            return False, f"XML/HTML parse error: {e}"
+
+    elif ext in ('.yaml', '.yml'):
+        try:
+            import yaml
+            yaml.safe_load(content)
+            return True, None
+        except ImportError:
+            return True, None  # skip if PyYAML not available
+        except Exception as e:
+            return False, f"YAML syntax error: {e}"
+
+    elif ext in ('.js', '.ts', '.jsx', '.tsx'):
+        return _validate_js_syntax(content)
+
+    # Generic fallback: always passes
+    return True, None
+
+
+def _validate_js_syntax(content: str) -> Tuple[bool, Optional[str]]:
+    """Basic JS/TS syntax validation: bracket/brace/paren balance + unclosed strings."""
+    stack = []
+    pairs = {')': '(', ']': '[', '}': '{'}
+    openers = set('([{')
+    in_single_line_comment = False
+    in_multi_line_comment = False
+    in_string = None  # None, or the quote char (' " `)
+    i = 0
+    while i < len(content):
+        ch = content[i]
+
+        # Handle comments
+        if in_single_line_comment:
+            if ch == '\n':
+                in_single_line_comment = False
+            i += 1
+            continue
+        if in_multi_line_comment:
+            if ch == '*' and i + 1 < len(content) and content[i + 1] == '/':
+                in_multi_line_comment = False
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # Handle strings
+        if in_string:
+            if ch == '\\':
+                i += 2  # skip escaped char
+                continue
+            if ch == in_string:
+                in_string = None
+            elif ch == '\n' and in_string != '`':
+                return False, f"Unclosed string literal at position {i}"
+            i += 1
+            continue
+
+        # Start of comment
+        if ch == '/' and i + 1 < len(content):
+            next_ch = content[i + 1]
+            if next_ch == '/':
+                in_single_line_comment = True
+                i += 2
+                continue
+            elif next_ch == '*':
+                in_multi_line_comment = True
+                i += 2
+                continue
+
+        # Start of string
+        if ch in ('"', "'", '`'):
+            in_string = ch
+            i += 1
+            continue
+
+        # Brackets
+        if ch in openers:
+            stack.append(ch)
+        elif ch in pairs:
+            if not stack:
+                return False, f"Unmatched closing '{ch}' at position {i}"
+            if stack[-1] != pairs[ch]:
+                return False, f"Mismatched '{ch}' at position {i}, expected closing for '{stack[-1]}'"
+            stack.pop()
+
+        i += 1
+
+    if in_string:
+        return False, "Unclosed string literal at end of file"
+    if stack:
+        return False, f"Unclosed '{stack[-1]}' at end of file"
+    return True, None
+
+
+def _compute_diff(old_content: str, new_content: str, file_path: str) -> str:
+    """Compute a unified diff between old and new content."""
+    old_lines = old_content.splitlines(keepends=True)
+    new_lines = new_content.splitlines(keepends=True)
+    diff_lines = difflib.unified_diff(
+        old_lines, new_lines,
+        fromfile=f"a/{os.path.basename(file_path)}",
+        tofile=f"b/{os.path.basename(file_path)}",
+    )
+    return ''.join(diff_lines)
+
+
 def apply_edit(
     file_path: str,
     old_text: str,
     new_text: str,
     threshold: float = 0.8,
     dry_run: bool = False,
+    validate: bool = False,
 ) -> EditResult:
     """Apply a single edit to a file."""
     try:
@@ -848,17 +985,83 @@ def apply_edit(
     if '\r\n' in content:
         new_content = new_content.replace('\n', '\r\n')
 
+    # Compute diff
+    diff_text = _compute_diff(content, new_content, file_path)
+
+    # Validate if requested
+    if validate:
+        valid, err = validate_syntax(file_path, new_content)
+        if not valid:
+            # Rollback: don't write, return validation error
+            return EditResult(
+                status="validation_error",
+                file=file_path,
+                match_type=match.match_type,
+                confidence=match.confidence,
+                matched_text=match.matched_text,
+                error=err,
+                diff=diff_text,
+            )
+
     if not dry_run:
         with open(file_path, 'w') as f:
             f.write(new_content)
 
-    return EditResult(
+    result = EditResult(
         status="applied",
         file=file_path,
         match_type=match.match_type,
         confidence=match.confidence,
         matched_text=match.matched_text,
+        diff=diff_text,
     )
+    if validate:
+        result.validated = True
+    return result
+
+
+def create_file(
+    file_path: str,
+    content: str,
+    force: bool = False,
+    validate: bool = False,
+) -> EditResult:
+    """Create a new file with the given content.
+
+    Fails if file already exists unless force=True.
+    Optionally validates syntax before writing.
+    """
+    if os.path.exists(file_path) and not force:
+        return EditResult(
+            status="error",
+            file=file_path,
+            error=f"File already exists: {file_path} (use --force to overwrite)",
+        )
+
+    if validate:
+        valid, err = validate_syntax(file_path, content)
+        if not valid:
+            return EditResult(
+                status="validation_error",
+                file=file_path,
+                error=err,
+            )
+
+    # Create parent directories if needed
+    parent = os.path.dirname(file_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    with open(file_path, 'w') as f:
+        f.write(content)
+
+    result = EditResult(
+        status="created",
+        file=file_path,
+    )
+    if validate:
+        result.validated = True
+    return result
 
 
 def result_to_dict(result: EditResult) -> dict:
@@ -872,6 +1075,10 @@ def result_to_dict(result: EditResult) -> dict:
         d["matched_text"] = result.matched_text
     if result.error is not None:
         d["error"] = result.error
+    if result.validated is not None:
+        d["validated"] = result.validated
+    if result.diff is not None:
+        d["diff"] = result.diff
     return d
 
 
@@ -924,8 +1131,76 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Show what would change without applying",
     )
+    apply_parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate syntax after applying (rollback on failure)",
+    )
+    apply_parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="Print unified diff to stderr",
+    )
+
+    # Create command
+    create_parser = sub.add_parser("create", help="Create a new file")
+    create_parser.add_argument("--file", help="Target file path", required=True)
+    create_parser.add_argument("--content", help="File content")
+    create_parser.add_argument(
+        "--stdin", action="store_true", help="Read content from stdin (or JSON with action=create)"
+    )
+    create_parser.add_argument(
+        "--force", action="store_true", help="Overwrite if file exists"
+    )
+    create_parser.add_argument(
+        "--validate", action="store_true", help="Validate syntax before writing"
+    )
+
+    # Validate command
+    validate_parser = sub.add_parser("validate", help="Validate a file's syntax")
+    validate_parser.add_argument("file", help="File to validate")
 
     args = parser.parse_args(argv)
+
+    if args.command == "validate":
+        try:
+            with open(args.file, 'r') as f:
+                content = f.read()
+        except (FileNotFoundError, OSError) as e:
+            print(json.dumps({"status": "error", "file": args.file, "error": str(e)}))
+            return 1
+        valid, err = validate_syntax(args.file, content)
+        result = {"status": "valid" if valid else "invalid", "file": args.file}
+        if err:
+            result["error"] = err
+        print(json.dumps(result, indent=2))
+        return 0 if valid else 1
+
+    if args.command == "create":
+        if args.stdin:
+            raw = sys.stdin.read()
+            # Try JSON first
+            try:
+                data = json.loads(raw)
+                content = data.get("content", raw)
+                file_path = data.get("file", args.file)
+            except (json.JSONDecodeError, ValueError):
+                content = raw
+                file_path = args.file
+        elif args.content is not None:
+            content = args.content
+            file_path = args.file
+        else:
+            print(json.dumps({"status": "error", "error": "Must provide --content or --stdin"}))
+            return 1
+
+        result = create_file(
+            file_path, content,
+            force=args.force,
+            validate=args.validate,
+        )
+        print(json.dumps(result_to_dict(result), indent=2))
+        return 0 if result.status == "created" else 1
 
     if args.command != "apply":
         parser.print_help()
@@ -949,10 +1224,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             file_path, old_text, new_text,
             threshold=args.threshold,
             dry_run=args.dry_run,
+            validate=args.validate,
         )
+
+        # Print diff to stderr if requested
+        if args.diff and result.diff:
+            print(result.diff, file=sys.stderr, end='')
+
         results.append(result_to_dict(result))
 
-        if result.status == "no_match" or result.status == "error":
+        if result.status in ("no_match", "error", "validation_error"):
             exit_code = max(exit_code, 1)
         elif result.status == "ambiguous":
             exit_code = max(exit_code, 2)

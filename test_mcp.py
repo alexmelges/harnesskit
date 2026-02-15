@@ -46,7 +46,7 @@ class TestToolsList:
         resps = mcp_call(init_msg(), {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         tools = resps[1]["result"]["tools"]
         names = {t["name"] for t in tools}
-        assert names == {"harnesskit_apply", "harnesskit_apply_batch", "harnesskit_match"}
+        assert names == {"harnesskit_apply", "harnesskit_apply_batch", "harnesskit_match", "harnesskit_create", "harnesskit_validate"}
 
 
 class TestApply:
@@ -161,3 +161,76 @@ class TestErrors:
         )
         resp = json.loads(proc.stdout.strip())
         assert resp["error"]["code"] == -32700
+
+
+class TestMCPCreate:
+    def test_create_file(self, tmp_path):
+        f = str(tmp_path / "new.py")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_create", {"file": f, "content": "x = 1\n"}),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "created"
+        assert open(f).read() == "x = 1\n"
+
+    def test_create_existing_fails(self, tmp_path):
+        f = str(tmp_path / "exist.py")
+        open(f, 'w').write("old")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_create", {"file": f, "content": "new"}),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "error"
+        assert resps[1]["result"]["isError"]
+
+    def test_create_with_validate(self, tmp_path):
+        f = str(tmp_path / "bad.py")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_create", {"file": f, "content": "def(\n", "validate": True}),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "validation_error"
+
+
+class TestMCPValidate:
+    def test_validate_valid(self, tmp_path):
+        f = str(tmp_path / "good.py")
+        open(f, 'w').write("x = 1\n")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_validate", {"file": f}),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "valid"
+        assert not resps[1]["result"]["isError"]
+
+    def test_validate_invalid(self, tmp_path):
+        f = str(tmp_path / "bad.json")
+        open(f, 'w').write("{bad json")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_validate", {"file": f}),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "invalid"
+        assert resps[1]["result"]["isError"]
+
+
+class TestMCPApplyWithValidate:
+    def test_apply_validate_rollback(self, tmp_path):
+        f = str(tmp_path / "test.py")
+        open(f, 'w').write("x = 1\nprint(x)\n")
+        resps = mcp_call(
+            init_msg(),
+            tool_call(2, "harnesskit_apply", {
+                "file": f, "old_text": "x = 1", "new_text": "x = 1 +",
+                "validate": True,
+            }),
+        )
+        result = json.loads(resps[1]["result"]["content"][0]["text"])
+        assert result["status"] == "validation_error"
+        # File unchanged
+        assert open(f).read() == "x = 1\nprint(x)\n"

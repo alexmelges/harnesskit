@@ -18,12 +18,12 @@ import json
 import sys
 from typing import Any, Optional
 
-from hk import apply_edit, find_best_match, result_to_dict, AmbiguousMatchError
+from hk import apply_edit, create_file, find_best_match, validate_syntax, result_to_dict, AmbiguousMatchError
 
 # MCP Protocol version
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "harnesskit"
-SERVER_VERSION = "0.2.0"
+SERVER_VERSION = "0.3.0"
 
 TOOLS = [
     {
@@ -57,6 +57,11 @@ TOOLS = [
                 "dry_run": {
                     "type": "boolean",
                     "description": "If true, show what would change without applying",
+                    "default": False,
+                },
+                "validate": {
+                    "type": "boolean",
+                    "description": "If true, validate syntax after applying (rollback on failure)",
                     "default": False,
                 },
             },
@@ -123,6 +128,54 @@ TOOLS = [
             "required": ["file", "old_text"],
         },
     },
+    {
+        "name": "harnesskit_create",
+        "description": (
+            "Create a new file with the given content. Fails if file "
+            "already exists unless force is true. Optionally validates syntax."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "description": "Path to the file to create",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "File content",
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Overwrite if file exists",
+                    "default": False,
+                },
+                "validate": {
+                    "type": "boolean",
+                    "description": "Validate syntax before writing",
+                    "default": False,
+                },
+            },
+            "required": ["file", "content"],
+        },
+    },
+    {
+        "name": "harnesskit_validate",
+        "description": (
+            "Validate a file's syntax without modifying it. Supports Python, "
+            "JSON, XML/HTML, YAML, and JavaScript/TypeScript."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "description": "Path to the file to validate",
+                },
+            },
+            "required": ["file"],
+        },
+    },
 ]
 
 
@@ -165,9 +218,10 @@ def handle_tool_call(id: Any, params: dict) -> dict:
             new_text=args["new_text"],
             threshold=args.get("threshold", 0.8),
             dry_run=args.get("dry_run", False),
+            validate=args.get("validate", False),
         )
         rd = result_to_dict(result)
-        is_error = result.status in ("no_match", "error", "ambiguous")
+        is_error = result.status in ("no_match", "error", "ambiguous", "validation_error")
         return make_response(id, {
             "content": [{"type": "text", "text": json.dumps(rd, indent=2)}],
             "isError": is_error,
@@ -234,6 +288,39 @@ def handle_tool_call(id: Any, params: dict) -> dict:
                 "start": match.start,
                 "end": match.end,
             }, indent=2)}],
+        })
+
+    elif name == "harnesskit_create":
+        result = create_file(
+            file_path=args["file"],
+            content=args["content"],
+            force=args.get("force", False),
+            validate=args.get("validate", False),
+        )
+        rd = result_to_dict(result)
+        is_error = result.status in ("error", "validation_error")
+        return make_response(id, {
+            "content": [{"type": "text", "text": json.dumps(rd, indent=2)}],
+            "isError": is_error,
+        })
+
+    elif name == "harnesskit_validate":
+        file_path = args["file"]
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+        except (FileNotFoundError, OSError) as e:
+            return make_response(id, {
+                "content": [{"type": "text", "text": json.dumps({"status": "error", "error": str(e)})}],
+                "isError": True,
+            })
+        valid, err = validate_syntax(file_path, content)
+        result = {"status": "valid" if valid else "invalid", "file": file_path}
+        if err:
+            result["error"] = err
+        return make_response(id, {
+            "content": [{"type": "text", "text": json.dumps(result, indent=2)}],
+            "isError": not valid,
         })
 
     else:

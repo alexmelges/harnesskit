@@ -119,9 +119,11 @@ Add to your MCP client config (e.g. Claude Desktop, Cursor, etc.):
 
 | Tool | Description |
 |------|-------------|
-| `harnesskit_apply` | Apply a fuzzy edit to a file |
+| `harnesskit_apply` | Apply a fuzzy edit to a file (supports `validate` param) |
 | `harnesskit_apply_batch` | Apply multiple edits in one call |
 | `harnesskit_match` | Preview the match without modifying (dry run) |
+| `harnesskit_create` | Create a new file (with optional validation) |
+| `harnesskit_validate` | Validate a file's syntax without modifying it |
 
 Each tool returns the match type, confidence score, and matched text — giving the agent full visibility into how the edit was resolved.
 
@@ -198,10 +200,72 @@ python3 benchmarks/benchmark.py
 ## Design Principles
 
 - **Single file, stdlib only** — copy it, vendor it, pip install it. No dependency hell.
-- **419 lines of Python** — small enough to audit in one sitting
+- **~1250 lines of Python** — still small enough to audit in one sitting
 - **Graceful degradation** — exact match when possible, fuzzy only when needed
 - **Transparent** — every result tells you *how* it matched and *how confident* it is
 - **Model-agnostic** — works with any LLM that can produce old/new text pairs
+
+## Post-Edit Validation
+
+HarnessKit can verify that edits don't break your code's syntax — and **automatically rolls back** if they do. No other edit tool does this.
+
+```bash
+# Validate after applying — rollback on syntax error
+hk apply --file app.py --old "x = 1" --new "x = 1 +" --validate
+# → status: "validation_error", file unchanged
+
+# Validate a file without editing
+hk validate app.py
+# → {"status": "valid", "file": "app.py"}
+```
+
+Supported languages (all stdlib, zero dependencies):
+
+| Extension | Validator |
+|-----------|-----------|
+| `.py` | `compile()` — catches all Python syntax errors |
+| `.json` | `json.loads()` — strict JSON validation |
+| `.xml`, `.html`, `.htm` | `ElementTree` — XML/HTML parse check |
+| `.yaml`, `.yml` | `yaml.safe_load()` (if PyYAML installed) |
+| `.js`, `.ts`, `.jsx`, `.tsx` | Bracket/brace/paren balance + unclosed string detection |
+| Other | Always passes (no false positives) |
+
+## Diff Output
+
+See exactly what changed with unified diff output:
+
+```bash
+# Show diff on stderr (JSON still goes to stdout)
+hk apply --file app.py --old "x = 1" --new "x = 2" --diff
+
+# Preview changes without writing
+hk apply --file app.py --old "x = 1" --new "x = 2" --diff --dry-run
+```
+
+Diff is also included in the JSON output (`"diff"` field) for programmatic use.
+
+## Create Files
+
+Coding agents don't just edit — they create files too:
+
+```bash
+# Create a new file
+hk create --file src/utils.py --content "def helper(): pass"
+
+# Fail if file exists (safe default)
+hk create --file src/utils.py --content "..."
+# → error: "File already exists"
+
+# Overwrite with --force
+hk create --file src/utils.py --content "..." --force
+
+# Validate syntax before creating
+hk create --file src/utils.py --content "def(" --validate
+# → validation_error, file NOT created
+
+# Read content from stdin
+echo 'print("hello")' | hk create --file hello.py --stdin
+```
 
 ## Configuration
 
@@ -209,13 +273,16 @@ python3 benchmarks/benchmark.py
 |------|---------|-------------|
 | `--threshold` | `0.8` | Minimum similarity score for fuzzy matching |
 | `--dry-run` | `false` | Preview changes without writing to disk |
+| `--validate` | `false` | Validate syntax after edit (rollback on failure) |
+| `--diff` | `false` | Print unified diff to stderr |
+| `--force` | `false` | Overwrite existing file (create command) |
 
 ## Development
 
 ```bash
 git clone https://github.com/alexmelges/harnesskit.git
 cd harnesskit
-python3 -m pytest test_hk.py test_mcp.py -v  # 53 tests
+python3 -m pytest test_hk.py test_mcp.py -v  # 86 tests
 ```
 
 ## License

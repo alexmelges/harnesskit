@@ -8,6 +8,9 @@ import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hk
+
 from hk import (
     AmbiguousMatchError,
     apply_edit,
@@ -424,6 +427,233 @@ class TestOutputFormat(unittest.TestCase):
         output = json.loads(result.stdout)
         self.assertEqual(output["status"], "error")
         self.assertIn("error", output)
+
+
+class TestValidateSyntax(unittest.TestCase):
+    """Tests for syntax validation."""
+
+    def test_valid_python(self):
+        valid, err = hk.validate_syntax("test.py", "x = 1\nprint(x)\n")
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_invalid_python(self):
+        valid, err = hk.validate_syntax("test.py", "def foo(\n  x = 1\n")
+        self.assertFalse(valid)
+        self.assertIn("syntax error", err.lower())
+
+    def test_valid_json(self):
+        valid, err = hk.validate_syntax("test.json", '{"key": "value"}')
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_invalid_json(self):
+        valid, err = hk.validate_syntax("test.json", '{"key": }')
+        self.assertFalse(valid)
+        self.assertIn("JSON", err)
+
+    def test_valid_xml(self):
+        valid, err = hk.validate_syntax("test.xml", "<root><child/></root>")
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_invalid_xml(self):
+        valid, err = hk.validate_syntax("test.xml", "<root><child></root>")
+        self.assertFalse(valid)
+        self.assertIn("parse error", err.lower())
+
+    def test_valid_js(self):
+        valid, err = hk.validate_syntax("test.js", "function foo() { return 1; }\n")
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_invalid_js_unmatched_brace(self):
+        valid, err = hk.validate_syntax("test.js", "function foo() { return 1;\n")
+        self.assertFalse(valid)
+        self.assertIn("Unclosed", err)
+
+    def test_invalid_js_unclosed_string(self):
+        valid, err = hk.validate_syntax("test.js", 'var x = "hello\nvar y = 1;\n')
+        self.assertFalse(valid)
+        self.assertIn("string", err.lower())
+
+    def test_js_template_literal_multiline(self):
+        valid, err = hk.validate_syntax("test.js", "var x = `hello\nworld`;\n")
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_js_comments_ignored(self):
+        valid, err = hk.validate_syntax("test.js", "// { unclosed\nvar x = 1;\n")
+        self.assertTrue(valid)
+
+    def test_unknown_extension(self):
+        valid, err = hk.validate_syntax("test.txt", "anything goes")
+        self.assertTrue(valid)
+        self.assertIsNone(err)
+
+    def test_typescript_validates(self):
+        valid, err = hk.validate_syntax("test.tsx", "const App = () => { return (<div></div>); };\n")
+        self.assertTrue(valid)
+
+
+class TestValidateOnApply(unittest.TestCase):
+    """Tests for --validate flag on apply."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_validate_pass(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("x = 1\nprint(x)\n")
+        result = hk.apply_edit(f, "x = 1", "x = 2", validate=True)
+        self.assertEqual(result.status, "applied")
+        self.assertTrue(result.validated)
+
+    def test_validate_fail_rollback(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        original = "x = 1\nprint(x)\n"
+        with open(f, 'w') as fh:
+            fh.write(original)
+        # This edit introduces a syntax error
+        result = hk.apply_edit(f, "x = 1", "x = 1 +", validate=True)
+        self.assertEqual(result.status, "validation_error")
+        self.assertIn("syntax error", result.error.lower())
+        # File should be unchanged (rollback)
+        with open(f) as fh:
+            self.assertEqual(fh.read(), original)
+
+    def test_validate_json_fail_rollback(self):
+        f = os.path.join(self.tmpdir, "test.json")
+        original = '{"key": "value"}'
+        with open(f, 'w') as fh:
+            fh.write(original)
+        result = hk.apply_edit(f, '"value"', '"value",', validate=True)
+        self.assertEqual(result.status, "validation_error")
+        with open(f) as fh:
+            self.assertEqual(fh.read(), original)
+
+
+class TestDiffOutput(unittest.TestCase):
+    """Tests for diff computation."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_diff_present_on_apply(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("x = 1\n")
+        result = hk.apply_edit(f, "x = 1", "x = 2")
+        self.assertIsNotNone(result.diff)
+        self.assertIn("-x = 1", result.diff)
+        self.assertIn("+x = 2", result.diff)
+
+    def test_diff_in_result_dict(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("x = 1\n")
+        result = hk.apply_edit(f, "x = 1", "x = 2")
+        d = hk.result_to_dict(result)
+        self.assertIn("diff", d)
+        self.assertIn("-x = 1", d["diff"])
+
+    def test_diff_unified_format(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("a = 1\nb = 2\nc = 3\n")
+        result = hk.apply_edit(f, "b = 2", "b = 99")
+        self.assertIn("---", result.diff)
+        self.assertIn("+++", result.diff)
+        self.assertIn("@@", result.diff)
+
+
+class TestCreateFile(unittest.TestCase):
+    """Tests for create file command."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_create_new_file(self):
+        f = os.path.join(self.tmpdir, "new.py")
+        result = hk.create_file(f, "x = 1\n")
+        self.assertEqual(result.status, "created")
+        with open(f) as fh:
+            self.assertEqual(fh.read(), "x = 1\n")
+
+    def test_create_existing_fails(self):
+        f = os.path.join(self.tmpdir, "exist.py")
+        with open(f, 'w') as fh:
+            fh.write("old")
+        result = hk.create_file(f, "new")
+        self.assertEqual(result.status, "error")
+        self.assertIn("already exists", result.error)
+        with open(f) as fh:
+            self.assertEqual(fh.read(), "old")
+
+    def test_create_force_overwrite(self):
+        f = os.path.join(self.tmpdir, "exist.py")
+        with open(f, 'w') as fh:
+            fh.write("old")
+        result = hk.create_file(f, "new", force=True)
+        self.assertEqual(result.status, "created")
+        with open(f) as fh:
+            self.assertEqual(fh.read(), "new")
+
+    def test_create_with_validation_pass(self):
+        f = os.path.join(self.tmpdir, "valid.py")
+        result = hk.create_file(f, "x = 1\n", validate=True)
+        self.assertEqual(result.status, "created")
+        self.assertTrue(result.validated)
+
+    def test_create_with_validation_fail(self):
+        f = os.path.join(self.tmpdir, "invalid.py")
+        result = hk.create_file(f, "def foo(\n", validate=True)
+        self.assertEqual(result.status, "validation_error")
+        self.assertFalse(os.path.exists(f))
+
+    def test_create_nested_dirs(self):
+        f = os.path.join(self.tmpdir, "a", "b", "c", "test.py")
+        result = hk.create_file(f, "x = 1\n")
+        self.assertEqual(result.status, "created")
+        self.assertTrue(os.path.exists(f))
+
+
+class TestValidateCommand(unittest.TestCase):
+    """Tests for the validate CLI command."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def test_validate_valid_file(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("x = 1\n")
+        exit_code = hk.main(["validate", f])
+        self.assertEqual(exit_code, 0)
+
+    def test_validate_invalid_file(self):
+        f = os.path.join(self.tmpdir, "test.py")
+        with open(f, 'w') as fh:
+            fh.write("def foo(\n")
+        exit_code = hk.main(["validate", f])
+        self.assertEqual(exit_code, 1)
 
 
 if __name__ == "__main__":
