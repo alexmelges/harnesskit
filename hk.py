@@ -367,6 +367,7 @@ def _adapt_replacement(old_text: str, new_text: str, matched_text: str, match_ty
     if match_type == "whitespace":
         adapted = _transfer_line_whitespace(old_text, new_text, matched_text)
         if adapted is not None:
+            adapted = _apply_alignment_patterns(adapted, matched_text)
             return adapted
         # Fall back to diff-based
         adapted = _apply_diff_based_edit(old_text, new_text, matched_text)
@@ -515,8 +516,10 @@ def _adapt_line_whitespace(old_line: str, new_line: str, matched_line: str) -> s
 
     # If the whitespace-normalized versions of old and matched are the same,
     # apply a character-level patch
+    old_no_ws = re.sub(r'\s', '', old_stripped)
+    matched_no_ws = re.sub(r'\s', '', matched_stripped)
     if normalize_whitespace(old_stripped) == normalize_whitespace(matched_stripped):
-        # The only difference is internal whitespace.
+        # The only difference is internal whitespace (possibly operator spacing).
         # Find what content was added/changed in new vs old, apply to matched
         sm = difflib.SequenceMatcher(None, old_stripped, new_stripped)
         result_chars = []
@@ -526,15 +529,155 @@ def _adapt_line_whitespace(old_line: str, new_line: str, matched_line: str) -> s
                 # Map positions from old_stripped to matched_stripped
                 result_chars.append(_map_segment(old_stripped, matched_stripped, i1, i2))
             elif tag == 'replace':
-                result_chars.append(new_stripped[j1:j2])
+                result_chars.append(_adapt_operator_spacing(new_stripped[j1:j2], old_stripped, matched_stripped))
             elif tag == 'insert':
-                result_chars.append(new_stripped[j1:j2])
+                result_chars.append(_adapt_operator_spacing(new_stripped[j1:j2], old_stripped, matched_stripped))
             # delete: skip
         adapted_content = ''.join(result_chars)
         ending = new_line[len(new_line.rstrip()):]  # preserve line ending
         return base_indent + adapted_content + ending
 
+    # If stripping ALL whitespace makes old and matched equal, it's an operator spacing difference.
+    # Only use this path if operator spacing patterns are detected.
+    if old_no_ws == matched_no_ws:
+        # Check if there's actually operator spacing to transfer
+        test_adapted = _adapt_operator_spacing(new_stripped, old_stripped, matched_stripped)
+        if test_adapted != new_stripped:
+            sm = difflib.SequenceMatcher(None, old_stripped, new_stripped)
+            result_chars = []
+            for tag, i1, i2, j1, j2 in sm.get_opcodes():
+                if tag == 'equal':
+                    result_chars.append(_map_segment(old_stripped, matched_stripped, i1, i2))
+                elif tag == 'replace':
+                    result_chars.append(_adapt_operator_spacing(new_stripped[j1:j2], old_stripped, matched_stripped))
+                elif tag == 'insert':
+                    result_chars.append(_adapt_operator_spacing(new_stripped[j1:j2], old_stripped, matched_stripped))
+            adapted_content = ''.join(result_chars)
+            ending = new_line[len(new_line.rstrip()):]
+            return base_indent + adapted_content + ending
+
     return base_indent + new_stripped + new_line[len(new_line.rstrip()):]
+
+
+def _apply_alignment_patterns(adapted_text: str, matched_text: str) -> str:
+    """Detect aligned operators in matched_text and apply alignment to adapted_text.
+
+    For example, if matched_text has '=>' aligned at column 19 across multiple lines,
+    ensure new/changed lines in adapted_text also align '=>' at column 19.
+    """
+    matched_lines = matched_text.splitlines(keepends=True)
+
+    # Detect alignment: find operators that appear at the same column in 3+ lines
+    # Common alignment operators: =>, =, :
+    alignment_ops = ['=>', '=', ':']
+
+    for op in alignment_ops:
+        # Find column positions of this operator in matched lines with same indentation
+        indent_to_columns = {}  # indent -> list of columns
+        for line in matched_lines:
+            stripped = line.rstrip()
+            if op not in stripped:
+                continue
+            indent = _get_line_indent(line)
+            col = stripped.find(op)
+            if col > 0:
+                indent_to_columns.setdefault(indent, []).append(col)
+
+        for indent, cols in indent_to_columns.items():
+            if len(cols) < 2:
+                continue
+            # Check if most are aligned to the same column
+            from collections import Counter
+            col_counts = Counter(cols)
+            most_common_col, count = col_counts.most_common(1)[0]
+            if count < 2:
+                continue
+
+            # Apply alignment to adapted lines with same indent that have this operator
+            adapted_lines = adapted_text.splitlines(keepends=True)
+            new_lines = []
+            for aline in adapted_lines:
+                astripped = aline.rstrip()
+                a_indent = _get_line_indent(aline)
+                if a_indent == indent and op in astripped:
+                    col = astripped.find(op)
+                    if col != most_common_col and col > 0:
+                        # Find the key part (before op) and value part (after op)
+                        before_op = astripped[:col].rstrip()
+                        after_op = astripped[col:]
+                        needed_spaces = most_common_col - len(before_op)
+                        if needed_spaces > 0:
+                            ending = aline[len(astripped):]
+                            aline = before_op + ' ' * needed_spaces + after_op + ending
+                new_lines.append(aline)
+            adapted_text = ''.join(new_lines)
+
+    return adapted_text
+
+
+def _adapt_operator_spacing(text: str, old_stripped: str, matched_stripped: str) -> str:
+    """Adapt operator spacing in text to match the style of matched_stripped.
+
+    Learns spacing patterns by comparing old_stripped (no spaces around ops)
+    with matched_stripped (spaces around ops), then applies those patterns
+    to the new text.
+    """
+    # Build a mapping of operator contexts: char-by-char alignment
+    old_nows = re.sub(r'\s', '', old_stripped)
+    matched_nows = re.sub(r'\s', '', matched_stripped)
+    if old_nows != matched_nows:
+        return text  # Content differs, can't learn spacing
+
+    # Walk through matched_stripped and learn spacing around each operator char
+    # by comparing with old_stripped (which has no/less spacing)
+    # Operator groups: learn spacing for a group, apply to all members
+    op_groups = {
+        'arith': set('+-*/%'),
+        'compare': set('=<>!'),
+        'bitwise': set('&|^~'),
+        'punct': set(',;:'),
+    }
+    char_to_group = {}
+    for group, chars in op_groups.items():
+        for c in chars:
+            char_to_group[c] = group
+
+    # Walk matched_stripped aligned with old_nows to learn spacing per group
+    spacing_before_group = set()  # groups that have space before
+    spacing_after_group = set()   # groups that have space after
+
+    ni = 0
+    for mc in range(len(matched_stripped)):
+        if ni >= len(old_nows):
+            break
+        if matched_stripped[mc] == old_nows[ni]:
+            ch = old_nows[ni]
+            group = char_to_group.get(ch)
+            if group:
+                if mc > 0 and matched_stripped[mc-1] == ' ':
+                    spacing_before_group.add(group)
+                if mc + 1 < len(matched_stripped) and matched_stripped[mc+1] == ' ':
+                    spacing_after_group.add(group)
+            ni += 1
+
+    if not spacing_before_group and not spacing_after_group:
+        return text
+
+    # Apply learned patterns to text
+    result = []
+    for i, ch in enumerate(text):
+        group = char_to_group.get(ch)
+        if group:
+            before = group in spacing_before_group
+            after = group in spacing_after_group
+            if before and (not result or result[-1] != ' '):
+                result.append(' ')
+            result.append(ch)
+            if after and i + 1 < len(text) and text[i+1] != ' ':
+                result.append(' ')
+        else:
+            result.append(ch)
+    return ''.join(result)
 
 
 def _map_segment(old_str: str, matched_str: str, start: int, end: int) -> str:
