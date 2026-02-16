@@ -1,0 +1,19 @@
+{
+  "name": "Multi-function stale context with class rename",
+  "category": "stale_context",
+  "difficulty": 4,
+  "source": "Real-world refactoring scenario",
+  "description": "LLM references old class name and method after class was renamed",
+  "original": "class UserService:\n    def __init__(self, db):\n        self.db = db\n\n    def get_user(self, user_id):\n        return self.db.query('SELECT * FROM users WHERE id = %s', (user_id,))\n\n    def update_user(self, user_id, data):\n        self.db.execute('UPDATE users SET name = %s WHERE id = %s', (data['name'], user_id))\n        return self.get_user(user_id)",
+  "llm_edit": {
+    "old_text": "class UserManager:\n    def __init__(self, db):\n        self.db = db\n\n    def get_user(self, user_id):\n        return self.db.query('SELECT * FROM users WHERE id = %s', (user_id,))\n\n    def update_user(self, user_id, data):\n        self.db.execute('UPDATE users SET name = %s WHERE id = %s', (data['name'], user_id))\n        return self.get_user(user_id)",
+    "new_text": "class UserManager:\n    def __init__(self, db):\n        self.db = db\n        self.cache = {}\n\n    def get_user(self, user_id):\n        if user_id in self.cache:\n            return self.cache[user_id]\n        result = self.db.query('SELECT * FROM users WHERE id = %s', (user_id,))\n        self.cache[user_id] = result\n        return result\n\n    def update_user(self, user_id, data):\n        self.db.execute('UPDATE users SET name = %s WHERE id = %s', (data['name'], user_id))\n        self.cache.pop(user_id, None)\n        return self.get_user(user_id)"
+  },
+  "expected": "class UserService:\n    def __init__(self, db):\n        self.db = db\n        self.cache = {}\n\n    def get_user(self, user_id):\n        if user_id in self.cache:\n            return self.cache[user_id]\n        result = self.db.query('SELECT * FROM users WHERE id = %s', (user_id,))\n        self.cache[user_id] = result\n        return result\n\n    def update_user(self, user_id, data):\n        self.db.execute('UPDATE users SET name = %s WHERE id = %s', (data['name'], user_id))\n        self.cache.pop(user_id, None)\n        return self.get_user(user_id)",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "aider",
+    "language": "python",
+    "common_pattern": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "String literal with whitespace differences",
+  "category": "whitespace_mismatch",
+  "difficulty": 3,
+  "source": "SQL string in Python has different internal formatting",
+  "description": "SQL query string formatting differs but code structure is same",
+  "original": "def get_orders(user_id, status=None):\n    query = \"\"\"\n        SELECT o.id, o.total, o.created_at,\n               u.name as customer_name\n        FROM orders o\n        JOIN users u ON u.id = o.user_id\n        WHERE o.user_id = %s\n    \"\"\"\n    params = [user_id]\n    if status:\n        query += \" AND o.status = %s\"\n        params.append(status)\n    return db.execute(query, params)",
+  "llm_edit": {
+    "old_text": "def get_orders(user_id, status=None):\n    query = \"\"\"\n      SELECT o.id, o.total, o.created_at,\n             u.name as customer_name\n      FROM orders o\n      JOIN users u ON u.id = o.user_id\n      WHERE o.user_id = %s\n    \"\"\"\n    params = [user_id]\n    if status:\n        query += \" AND o.status = %s\"\n        params.append(status)\n    return db.execute(query, params)",
+    "new_text": "def get_orders(user_id, status=None, limit=50):\n    query = \"\"\"\n      SELECT o.id, o.total, o.created_at,\n             u.name as customer_name\n      FROM orders o\n      JOIN users u ON u.id = o.user_id\n      WHERE o.user_id = %s\n    \"\"\"\n    params = [user_id]\n    if status:\n        query += \" AND o.status = %s\"\n        params.append(status)\n    query += \" ORDER BY o.created_at DESC LIMIT %s\"\n    params.append(limit)\n    return db.execute(query, params)"
+  },
+  "expected": "def get_orders(user_id, status=None, limit=50):\n    query = \"\"\"\n        SELECT o.id, o.total, o.created_at,\n               u.name as customer_name\n        FROM orders o\n        JOIN users u ON u.id = o.user_id\n        WHERE o.user_id = %s\n    \"\"\"\n    params = [user_id]\n    if status:\n        query += \" AND o.status = %s\"\n        params.append(status)\n    query += \" ORDER BY o.created_at DESC LIMIT %s\"\n    params.append(limit)\n    return db.execute(query, params)",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "continue",
+    "language": "python",
+    "common_pattern": true
+  }
+}

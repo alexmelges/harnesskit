@@ -1,0 +1,19 @@
+{
+  "name": "Rust lifetime annotation stale context",
+  "category": "stale_context",
+  "difficulty": 4,
+  "source": "Lifetime annotations added during review",
+  "description": "Rust function had lifetime annotations added since LLM read it",
+  "original": "impl<'a> Parser<'a> {\n    fn parse_expression(&mut self, input: &'a str) -> Result<Expr<'a>, ParseError> {\n        let token = self.next_token(input)?;\n        match token.kind {\n            TokenKind::Number => Ok(Expr::Literal(token.value)),\n            TokenKind::Ident => Ok(Expr::Variable(token.value)),\n            _ => Err(ParseError::UnexpectedToken(token)),\n        }\n    }\n}",
+  "llm_edit": {
+    "old_text": "impl Parser {\n    fn parse_expression(&mut self, input: &str) -> Result<Expr, ParseError> {\n        let token = self.next_token(input)?;\n        match token.kind {\n            TokenKind::Number => Ok(Expr::Literal(token.value)),\n            TokenKind::Ident => Ok(Expr::Variable(token.value)),\n            _ => Err(ParseError::UnexpectedToken(token)),\n        }\n    }\n}",
+    "new_text": "impl Parser {\n    fn parse_expression(&mut self, input: &str) -> Result<Expr, ParseError> {\n        let token = self.next_token(input)?;\n        match token.kind {\n            TokenKind::Number => Ok(Expr::Literal(token.value)),\n            TokenKind::Ident => Ok(Expr::Variable(token.value)),\n            TokenKind::LParen => {\n                let expr = self.parse_expression(input)?;\n                self.expect_token(TokenKind::RParen, input)?;\n                Ok(Expr::Group(Box::new(expr)))\n            }\n            _ => Err(ParseError::UnexpectedToken(token)),\n        }\n    }\n}"
+  },
+  "expected": "impl<'a> Parser<'a> {\n    fn parse_expression(&mut self, input: &'a str) -> Result<Expr<'a>, ParseError> {\n        let token = self.next_token(input)?;\n        match token.kind {\n            TokenKind::Number => Ok(Expr::Literal(token.value)),\n            TokenKind::Ident => Ok(Expr::Variable(token.value)),\n            TokenKind::LParen => {\n                let expr = self.parse_expression(input)?;\n                self.expect_token(TokenKind::RParen, input)?;\n                Ok(Expr::Group(Box::new(expr)))\n            }\n            _ => Err(ParseError::UnexpectedToken(token)),\n        }\n    }\n}",
+  "metadata": {
+    "model": "gpt-4-turbo",
+    "tool": "aider",
+    "language": "rust",
+    "common_pattern": true
+  }
+}

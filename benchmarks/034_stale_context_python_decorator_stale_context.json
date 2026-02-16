@@ -1,0 +1,19 @@
+{
+  "name": "Python decorator stale context",
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Decorators added by another developer",
+  "description": "Decorators were added to function since LLM last read",
+  "original": "@app.route('/api/users', methods=['GET'])\n@require_auth\n@cache(ttl=300)\ndef list_users():\n    users = User.query.all()\n    return jsonify([u.to_dict() for u in users])",
+  "llm_edit": {
+    "old_text": "@app.route('/api/users', methods=['GET'])\ndef list_users():\n    users = User.query.all()\n    return jsonify([u.to_dict() for u in users])",
+    "new_text": "@app.route('/api/users', methods=['GET'])\ndef list_users():\n    page = request.args.get('page', 1, type=int)\n    per_page = request.args.get('per_page', 20, type=int)\n    users = User.query.paginate(page=page, per_page=per_page)\n    return jsonify({\n        'users': [u.to_dict() for u in users.items],\n        'total': users.total,\n        'page': page\n    })"
+  },
+  "expected": "@app.route('/api/users', methods=['GET'])\ndef list_users():\n    page = request.args.get('page', 1, type=int)\n    per_page = request.args.get('per_page', 20, type=int)\n    users = User.query.paginate(page=page, per_page=per_page)\n    return jsonify({\n        'users': [u.to_dict() for u in users.items],\n        'total': users.total,\n        'page': page\n    })",
+  "metadata": {
+    "model": "gpt-4-turbo",
+    "tool": "cursor",
+    "language": "python",
+    "common_pattern": true
+  }
+}

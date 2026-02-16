@@ -1,0 +1,19 @@
+{
+  "name": "CSS with vendor prefix differences",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "Autoprefixer added vendor prefixes",
+  "description": "CSS has vendor prefixes added by autoprefixer that LLM doesnt know about",
+  "original": ".card {\n  display: -webkit-box;\n  display: -ms-flexbox;\n  display: flex;\n  -webkit-box-orient: vertical;\n  -webkit-box-direction: normal;\n      -ms-flex-direction: column;\n          flex-direction: column;\n  border-radius: 8px;\n  padding: 16px;\n}",
+  "llm_edit": {
+    "old_text": ".card {\n  display: flex;\n  flex-direction: column;\n  border-radius: 8px;\n  padding: 16px;\n}",
+    "new_text": ".card {\n  display: flex;\n  flex-direction: column;\n  border-radius: 8px;\n  padding: 16px;\n  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n  transition: transform 0.2s ease;\n}"
+  },
+  "expected": ".card {\n  display: -webkit-box;\n  display: -ms-flexbox;\n  display: flex;\n  -webkit-box-orient: vertical;\n  -webkit-box-direction: normal;\n      -ms-flex-direction: column;\n          flex-direction: column;\n  display: flex;\n  flex-direction: column;\n  border-radius: 8px;\n  padding: 16px;\n  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n  transition: transform 0.2s ease;\n}",
+  "metadata": {
+    "model": "gpt-4-turbo",
+    "tool": "aider",
+    "language": "css",
+    "common_pattern": true
+  }
+}

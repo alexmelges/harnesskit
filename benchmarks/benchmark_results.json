@@ -1,22 +1,22 @@
 {
-  "timestamp": "2026-02-16 06:32:12.035719",
-  "total_tests": 30,
+  "timestamp": "2026-02-16 06:38:42.830941",
+  "total_tests": 42,
   "overall_success_rate": 100.0,
   "category_stats": {
     "whitespace_mismatch": {
-      "total": 7,
-      "passed": 7,
+      "total": 11,
+      "passed": 11,
       "failed": 0,
-      "avg_confidence": 0.9571428571428571,
-      "avg_difficulty": 1.5714285714285714,
+      "avg_confidence": 0.9504181818181817,
+      "avg_difficulty": 1.9090909090909092,
       "success_rate": 100.0
     },
     "stale_context": {
-      "total": 5,
-      "passed": 5,
+      "total": 11,
+      "passed": 11,
       "failed": 0,
-      "avg_confidence": 0.9555,
-      "avg_difficulty": 3.0,
+      "avg_confidence": 0.9369,
+      "avg_difficulty": 3.1818181818181817,
       "success_rate": 100.0
     },
     "partial_match": {
@@ -28,11 +28,11 @@
       "success_rate": 100.0
     },
     "indentation_drift": {
-      "total": 4,
-      "passed": 4,
+      "total": 6,
+      "passed": 6,
       "failed": 0,
-      "avg_confidence": 0.95,
-      "avg_difficulty": 3.25,
+      "avg_confidence": 0.9499999999999998,
+      "avg_difficulty": 3.3333333333333335,
       "success_rate": 100.0
     },
     "line_number_off": {
@@ -61,7 +61,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 40.08603096008301
+      "execution_time_ms": 39.69693183898926
     },
     {
       "name": "Python function with extra whitespace",
@@ -71,7 +71,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.46602821350098
+      "execution_time_ms": 34.54303741455078
     },
     {
       "name": "Stale context after variable rename",
@@ -81,7 +81,7 @@
       "confidence": 0.9624,
       "match_type": "fuzzy",
       "error": "",
-      "execution_time_ms": 1051.8808364868164
+      "execution_time_ms": 1054.4650554656982
     },
     {
       "name": "Partial function match missing context",
@@ -91,7 +91,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 35.489797592163086
+      "execution_time_ms": 35.31002998352051
     },
     {
       "name": "Mixed tabs and spaces indentation",
@@ -101,7 +101,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.59000587463379
+      "execution_time_ms": 35.04467010498047
     },
     {
       "name": "Wrong line number for import insertion",
@@ -111,7 +111,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 35.035133361816406
+      "execution_time_ms": 35.024166107177734
     },
     {
       "name": "Unicode normalization mismatch",
@@ -121,7 +121,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.30581092834473
+      "execution_time_ms": 34.12580490112305
     },
     {
       "name": "Trailing whitespace mismatch in HTML",
@@ -131,7 +131,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.53993797302246
+      "execution_time_ms": 34.56401824951172
     },
     {
       "name": "React component with stale prop names",
@@ -141,7 +141,7 @@
       "confidence": 0.9274,
       "match_type": "fuzzy",
       "error": "",
-      "execution_time_ms": 936.3996982574463
+      "execution_time_ms": 930.9051036834717
     },
     {
       "name": "SQL query partial match in multiline string",
@@ -151,7 +151,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.96980667114258
+      "execution_time_ms": 35.34197807312012
     },
     {
       "name": "YAML indentation drift with 2-space vs 4-space",
@@ -161,7 +161,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.63912010192871
+      "execution_time_ms": 34.47580337524414
     },
     {
       "name": "Go interface method spacing",
@@ -171,7 +171,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.3928337097168
+      "execution_time_ms": 35.10904312133789
     },
     {
       "name": "CSS class name stale reference",
@@ -181,7 +181,7 @@
       "confidence": 0.9863,
       "match_type": "fuzzy",
       "error": "",
-      "execution_time_ms": 596.0640907287598
+      "execution_time_ms": 590.9321308135986
     },
     {
       "name": "JSON configuration partial object match",
@@ -191,7 +191,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.2862606048584
+      "execution_time_ms": 34.715890884399414
     },
     {
       "name": "Function insertion at wrong line after edits",
@@ -201,7 +201,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 33.95676612854004
+      "execution_time_ms": 34.21211242675781
     },
     {
       "name": "Invisible Unicode characters in code",
@@ -211,7 +211,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.18111801147461
+      "execution_time_ms": 34.94405746459961
     },
     {
       "name": "Markdown list with inconsistent spacing",
@@ -221,7 +221,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 34.552812576293945
+      "execution_time_ms": 34.85608100891113
     },
     {
       "name": "Docker Compose stale service names",
@@ -231,7 +231,7 @@
       "confidence": 0.9748,
       "match_type": "fuzzy",
       "error": "",
-      "execution_time_ms": 2005.7499408721924
+      "execution_time_ms": 1994.7361946105957
     },
     {
       "name": "Rust macro partial match missing attributes",
@@ -241,7 +241,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 35.52103042602539
+      "execution_time_ms": 34.806013107299805
     },
     {
       "name": "XML nested element indentation mismatch",
@@ -251,7 +251,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 35.19296646118164
+      "execution_time_ms": 35.14599800109863
     },
     {
       "name": "Comment insertion at wrong line number",
@@ -261,7 +261,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.787893295288086
+      "execution_time_ms": 34.75308418273926
     },
     {
       "name": "Windows vs Unix line ending mismatch",
@@ -271,7 +271,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.39211845397949
+      "execution_time_ms": 34.41596031188965
     },
     {
       "name": "PHP array formatting whitespace mismatch",
@@ -281,7 +281,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 35.256147384643555
+      "execution_time_ms": 34.436941146850586
     },
     {
       "name": "Terraform resource stale naming",
@@ -291,7 +291,7 @@
       "confidence": 0.9266,
       "match_type": "fuzzy",
       "error": "",
-      "execution_time_ms": 4290.641069412231
+      "execution_time_ms": 4242.869138717651
     },
     {
       "name": "C struct partial match without typedef",
@@ -301,7 +301,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.768104553222656
+      "execution_time_ms": 35.07518768310547
     },
     {
       "name": "Makefile tab vs space indentation",
@@ -311,7 +311,7 @@
       "confidence": 0.95,
       "match_type": "whitespace",
       "error": "",
-      "execution_time_ms": 35.46905517578125
+      "execution_time_ms": 35.31503677368164
     },
     {
       "name": "Class method insertion at wrong line",
@@ -321,7 +321,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 35.08114814758301
+      "execution_time_ms": 34.88302230834961
     },
     {
       "name": "UTF-8 BOM (Byte Order Mark) mismatch",
@@ -331,7 +331,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 35.280704498291016
+      "execution_time_ms": 35.20488739013672
     },
     {
       "name": "PowerShell cmdlet parameter spacing",
@@ -341,7 +341,7 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.9268913269043
+      "execution_time_ms": 35.24279594421387
     },
     {
       "name": "Kotlin data class partial match missing annotations",
@@ -351,7 +351,127 @@
       "confidence": 1.0,
       "match_type": "exact",
       "error": "",
-      "execution_time_ms": 34.51395034790039
+      "execution_time_ms": 34.90781784057617
+    },
+    {
+      "name": "Multi-function stale context with class rename",
+      "category": "stale_context",
+      "difficulty": 4,
+      "success": true,
+      "confidence": 0.9802,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 365.3838634490967
+    },
+    {
+      "name": "Comment drift with added docstrings",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.8507,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 4468.109846115112
+    },
+    {
+      "name": "Trailing comma style mismatch",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 0.9921,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 103.41310501098633
+    },
+    {
+      "name": "Python decorator stale context",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.9013,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 248.55303764343262
+    },
+    {
+      "name": "HTML with embedded JS whitespace",
+      "category": "whitespace_mismatch",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 34.55615043640137
+    },
+    {
+      "name": "YAML config nested indentation drift",
+      "category": "indentation_drift",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 34.84797477722168
+    },
+    {
+      "name": "Rust lifetime annotation stale context",
+      "category": "stale_context",
+      "difficulty": 4,
+      "success": true,
+      "confidence": 0.9801,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 689.136266708374
+    },
+    {
+      "name": "String literal with whitespace differences",
+      "category": "whitespace_mismatch",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 35.11500358581543
+    },
+    {
+      "name": "Java annotation order change",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.9293,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 654.4630527496338
+    },
+    {
+      "name": "CSS with vendor prefix differences",
+      "category": "whitespace_mismatch",
+      "difficulty": 2,
+      "success": true,
+      "confidence": 0.8625,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 627.3379325866699
+    },
+    {
+      "name": "Mixed tabs and spaces in Makefile",
+      "category": "indentation_drift",
+      "difficulty": 4,
+      "success": true,
+      "confidence": 0.95,
+      "match_type": "whitespace",
+      "error": "",
+      "execution_time_ms": 35.20011901855469
+    },
+    {
+      "name": "Ruby method with changed default args",
+      "category": "stale_context",
+      "difficulty": 3,
+      "success": true,
+      "confidence": 0.8868,
+      "match_type": "fuzzy",
+      "error": "",
+      "execution_time_ms": 1093.832015991211
     }
   ]
 }

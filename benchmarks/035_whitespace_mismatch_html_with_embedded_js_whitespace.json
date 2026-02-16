@@ -1,0 +1,19 @@
+{
+  "name": "HTML with embedded JS whitespace",
+  "category": "whitespace_mismatch",
+  "difficulty": 3,
+  "source": "Prettier reformats HTML differently than LLM expects",
+  "description": "HTML template with embedded JavaScript has different indentation than LLM expects",
+  "original": "<div id=\"app\">\n  <h1>{{ title }}</h1>\n  <script>\n    document.addEventListener('DOMContentLoaded', () => {\n      const app = document.getElementById('app');\n      app.classList.add('loaded');\n    });\n  </script>\n</div>",
+  "llm_edit": {
+    "old_text": "<div id=\"app\">\n    <h1>{{ title }}</h1>\n    <script>\n        document.addEventListener('DOMContentLoaded', () => {\n            const app = document.getElementById('app');\n            app.classList.add('loaded');\n        });\n    </script>\n</div>",
+    "new_text": "<div id=\"app\">\n    <h1>{{ title }}</h1>\n    <button id=\"toggle\">Toggle</button>\n    <script>\n        document.addEventListener('DOMContentLoaded', () => {\n            const app = document.getElementById('app');\n            app.classList.add('loaded');\n            document.getElementById('toggle').addEventListener('click', () => {\n                app.classList.toggle('dark');\n            });\n        });\n    </script>\n</div>"
+  },
+  "expected": "<div id=\"app\">\n  <h1>{{ title }}</h1>\n  <button id=\"toggle\">Toggle</button>\n  <script>\n    document.addEventListener('DOMContentLoaded', () => {\n      const app = document.getElementById('app');\n      app.classList.add('loaded');\n      document.getElementById('toggle').addEventListener('click', () => {\n        app.classList.toggle('dark');\n      });\n    });\n  </script>\n</div>",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "aider",
+    "language": "html",
+    "common_pattern": true
+  }
+}

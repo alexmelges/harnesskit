@@ -1,0 +1,19 @@
+{
+  "name": "YAML config nested indentation drift",
+  "category": "indentation_drift",
+  "difficulty": 3,
+  "source": "YAML editor normalizes to 2-space but LLM uses 4-space",
+  "description": "YAML config uses 2-space indent, LLM generates with 4-space",
+  "original": "database:\n  host: localhost\n  port: 5432\n  credentials:\n    username: admin\n    password: secret\n  pool:\n    min: 5\n    max: 20\n    idle_timeout: 30s",
+  "llm_edit": {
+    "old_text": "database:\n    host: localhost\n    port: 5432\n    credentials:\n        username: admin\n        password: secret\n    pool:\n        min: 5\n        max: 20\n        idle_timeout: 30s",
+    "new_text": "database:\n    host: localhost\n    port: 5432\n    credentials:\n        username: admin\n        password: secret\n    pool:\n        min: 5\n        max: 20\n        idle_timeout: 30s\n    ssl:\n        enabled: true\n        cert_path: /etc/ssl/db.crt"
+  },
+  "expected": "database:\n  host: localhost\n  port: 5432\n  credentials:\n    username: admin\n    password: secret\n  pool:\n    min: 5\n    max: 20\n    idle_timeout: 30s\n  ssl:\n    enabled: true\n    cert_path: /etc/ssl/db.crt",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "aider",
+    "language": "yaml",
+    "common_pattern": true
+  }
+}

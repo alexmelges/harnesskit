@@ -1,0 +1,19 @@
+{
+  "name": "Java annotation order change",
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Annotations reordered by code style tool",
+  "description": "Java annotations were reordered and new ones added since LLM read",
+  "original": "@RestController\n@RequestMapping(\"/api/v2/products\")\n@CrossOrigin(origins = \"*\")\n@Validated\npublic class ProductController {\n    @Autowired\n    private ProductService productService;\n\n    @GetMapping\n    public ResponseEntity<List<Product>> getAll() {\n        return ResponseEntity.ok(productService.findAll());\n    }\n}",
+  "llm_edit": {
+    "old_text": "@RestController\n@RequestMapping(\"/api/products\")\npublic class ProductController {\n    @Autowired\n    private ProductService productService;\n\n    @GetMapping\n    public ResponseEntity<List<Product>> getAll() {\n        return ResponseEntity.ok(productService.findAll());\n    }\n}",
+    "new_text": "@RestController\n@RequestMapping(\"/api/products\")\npublic class ProductController {\n    @Autowired\n    private ProductService productService;\n\n    @GetMapping\n    public ResponseEntity<List<Product>> getAll(@RequestParam(required = false) String category) {\n        if (category != null) {\n            return ResponseEntity.ok(productService.findByCategory(category));\n        }\n        return ResponseEntity.ok(productService.findAll());\n    }\n}"
+  },
+  "expected": "@RestController\n@RequestMapping(\"/api/v2/products\")\npublic class ProductController {\n    @Autowired\n    private ProductService productService;\n\n    @GetMapping\n    public ResponseEntity<List<Product>> getAll(@RequestParam(required = false) String category) {\n        if (category != null) {\n            return ResponseEntity.ok(productService.findByCategory(category));\n        }\n        return ResponseEntity.ok(productService.findAll());\n    }\n}",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "cursor",
+    "language": "java",
+    "common_pattern": true
+  }
+}

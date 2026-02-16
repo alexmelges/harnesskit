@@ -1,0 +1,19 @@
+{
+  "name": "Trailing comma style mismatch",
+  "category": "whitespace_mismatch",
+  "difficulty": 2,
+  "source": "Prettier enforces trailing commas, LLM omits them",
+  "description": "Project uses trailing commas but LLM generates without them",
+  "original": "const config = {\n  host: \"localhost\",\n  port: 3000,\n  debug: true,\n  logging: {\n    level: \"info\",\n    file: \"app.log\",\n  },\n};",
+  "llm_edit": {
+    "old_text": "const config = {\n  host: \"localhost\",\n  port: 3000,\n  debug: true,\n  logging: {\n    level: \"info\",\n    file: \"app.log\"\n  }\n};",
+    "new_text": "const config = {\n  host: \"localhost\",\n  port: 3000,\n  debug: false,\n  logging: {\n    level: \"warn\",\n    file: \"app.log\"\n  }\n};"
+  },
+  "expected": "const config = {\n  host: \"localhost\",\n  port: 3000,\n  debug: false,\n  logging: {\n    level: \"warn\",\n    file: \"app.log\",\n  },\n};",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "continue",
+    "language": "javascript",
+    "common_pattern": true
+  }
+}

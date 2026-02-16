@@ -176,25 +176,24 @@ result = apply_edit("app.py", old_text, new_text, threshold=0.8)
 
 ## Benchmarks
 
-We tested HarnessKit against **45 realistic edit failure scenarios** — the kind that break `str_replace` and `apply_patch` in production agent workflows.
+We tested HarnessKit against **42 realistic edit failure scenarios** across 6 categories — the kind that break `str_replace` and `apply_patch` in production agent workflows.
 
-| Category | Exact Match | HarnessKit | Recovery Rate |
+| Category | Cases | Pass Rate | Avg Confidence |
 |---|---|---|---|
-| **Whitespace** (tabs/spaces, trailing, indentation, CRLF, nesting) | 0/11 | **11/11** | 100% |
-| **Hallucinations** (typos, quotes, types, multi-language) | 0/16 | **16/16** | 100% |
-| **Line Drift** (shifted context, extra decorators, renames) | 2/5 | **5/5** | 100% |
-| **Partial Matches** (subset of target) | 2/2 | **2/2** | — |
-| **Real-World** (str_replace failures, docstring diffs) | 0/6 | **6/6** | 100% |
-| **Hard** (multi-error combos, brace styles, compression) | 0/5 | **5/5** | 100% |
-| **Total** | **4/45 (9%)** | **45/45 (100%)** | **100%** |
+| **Whitespace Mismatch** (tabs/spaces, trailing, CRLF, vendor prefixes, commas) | 11 | **100%** | 0.950 |
+| **Stale Context** (renames, decorators, type changes, docstrings) | 11 | **100%** | 0.937 |
+| **Partial Match** (incomplete blocks, missing context) | 6 | **100%** | 1.000 |
+| **Indentation Drift** (mixed tabs/spaces, YAML, Makefile) | 6 | **100%** | 0.950 |
+| **Line Number Off** (shifted imports, functions, comments) | 4 | **100%** | 1.000 |
+| **Encoding Issues** (Unicode, BOM, invisible chars, CRLF) | 4 | **100%** | 1.000 |
+| **Total** | **42** | **100%** | **0.964** |
 
-> **Exact match succeeds 9% of the time. HarnessKit succeeds 100% of the time.**
-> 41 out of 41 failed edits recovered.
+> **42/42 benchmarks passing.** Covers Python, TypeScript, Rust, Go, Java, Ruby, CSS, HTML, YAML, Makefile, and more.
 
 Run the benchmarks yourself:
 
 ```bash
-python3 benchmarks/benchmark.py
+python3 benchmarks/run_benchmarks.py
 ```
 
 ## Design Principles

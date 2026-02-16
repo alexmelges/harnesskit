@@ -1,0 +1,19 @@
+{
+  "name": "Ruby method with changed default args",
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Default arguments changed in review",
+  "description": "Ruby method had default arguments updated since LLM last read",
+  "original": "class EmailService\n  def send_notification(user, subject:, body:, priority: :normal, format: :html)\n    template = load_template(format)\n    rendered = template.render(user: user, body: body)\n    \n    mail = Mail.new(\n      to: user.email,\n      subject: subject,\n      body: rendered,\n      priority: priority\n    )\n    mail.deliver!\n  end\nend",
+  "llm_edit": {
+    "old_text": "class EmailService\n  def send_notification(user, subject:, body:)\n    template = load_template(:html)\n    rendered = template.render(user: user, body: body)\n    \n    mail = Mail.new(\n      to: user.email,\n      subject: subject,\n      body: rendered\n    )\n    mail.deliver!\n  end\nend",
+    "new_text": "class EmailService\n  def send_notification(user, subject:, body:)\n    template = load_template(:html)\n    rendered = template.render(user: user, body: body)\n    \n    mail = Mail.new(\n      to: user.email,\n      subject: subject,\n      body: rendered\n    )\n    \n    if Rails.env.production?\n      mail.deliver_later\n    else\n      mail.deliver!\n    end\n  end\nend"
+  },
+  "expected": "class EmailService\n  def send_notification(user, subject:, body:, priority: :normal, format: :html)\n    template = load_template(format)\n    rendered = template.render(user: user, body: body)\n    \n    mail = Mail.new(\n      to: user.email,\n      subject: subject,\n      body: rendered,\n    )\n    \n    if Rails.env.production?\n      mail.deliver_later\n    else\n      mail.deliver!\n    end\n  end\nend",
+  "metadata": {
+    "model": "gpt-4",
+    "tool": "aider",
+    "language": "ruby",
+    "common_pattern": true
+  }
+}

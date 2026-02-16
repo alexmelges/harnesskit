@@ -1,0 +1,19 @@
+{
+  "name": "Comment drift with added docstrings",
+  "category": "stale_context",
+  "difficulty": 3,
+  "source": "Auto-generated docstrings added between reads",
+  "description": "Comments and docstrings were added since LLM last read the file",
+  "original": "def calculate_tax(income, rate, deductions=None):\n    \"\"\"Calculate tax for a given income.\n    \n    Args:\n        income: Annual income in dollars\n        rate: Tax rate as decimal (e.g., 0.25)\n        deductions: Optional list of deduction amounts\n    \n    Returns:\n        Calculated tax amount after deductions\n    \"\"\"\n    if deductions:\n        income -= sum(deductions)\n    return max(0, income * rate)",
+  "llm_edit": {
+    "old_text": "def calculate_tax(income, rate, deductions=None):\n    if deductions:\n        income -= sum(deductions)\n    return max(0, income * rate)",
+    "new_text": "def calculate_tax(income, rate, deductions=None):\n    if deductions:\n        income -= sum(deductions)\n    tax = income * rate\n    return max(0, round(tax, 2))"
+  },
+  "expected": "def calculate_tax(income, rate, deductions=None):\n    \"\"\"Calculate tax for a given income.\n    \n    Args:\n        income: Annual income in dollars\n        rate: Tax rate as decimal (e.g., 0.25)\n        deductions: Optional list of deduction amounts\n    \n    Returns:\n        Calculated tax amount after deductions\n    if deductions:\n        income -= sum(deductions)\n    tax = income * rate\n    return max(0, round(tax, 2))",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "cursor",
+    "language": "python",
+    "common_pattern": true
+  }
+}

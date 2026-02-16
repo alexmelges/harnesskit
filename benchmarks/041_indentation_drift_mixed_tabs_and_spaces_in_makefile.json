@@ -1,0 +1,19 @@
+{
+  "name": "Mixed tabs and spaces in Makefile",
+  "category": "indentation_drift",
+  "difficulty": 4,
+  "source": "Makefile requires tabs but LLM uses spaces",
+  "description": "Makefile rules need tabs, LLM generates with spaces",
+  "original": ".PHONY: build test clean\n\nbuild:\n\t@echo \"Building...\"\n\tgo build -o bin/server ./cmd/server\n\ntest:\n\t@echo \"Testing...\"\n\tgo test ./... -v -count=1\n\nclean:\n\t@echo \"Cleaning...\"\n\trm -rf bin/",
+  "llm_edit": {
+    "old_text": ".PHONY: build test clean\n\nbuild:\n    @echo \"Building...\"\n    go build -o bin/server ./cmd/server\n\ntest:\n    @echo \"Testing...\"\n    go test ./... -v -count=1\n\nclean:\n    @echo \"Cleaning...\"\n    rm -rf bin/",
+    "new_text": ".PHONY: build test clean lint\n\nbuild:\n    @echo \"Building...\"\n    go build -o bin/server ./cmd/server\n\ntest:\n    @echo \"Testing...\"\n    go test ./... -v -count=1\n\nlint:\n    @echo \"Linting...\"\n    golangci-lint run ./...\n\nclean:\n    @echo \"Cleaning...\"\n    rm -rf bin/"
+  },
+  "expected": ".PHONY: build test clean lint\n\nbuild:\n\t@echo \"Building...\"\n\tgo build -o bin/server ./cmd/server\n\ntest:\n\t@echo \"Testing...\"\n\tgo test ./... -v -count=1\n\nlint:\n\t@echo \"Linting...\"\n\tgolangci-lint run ./...\n\nclean:\n\t@echo \"Cleaning...\"\n\trm -rf bin/",
+  "metadata": {
+    "model": "claude-3.5-sonnet",
+    "tool": "claude-code",
+    "language": "makefile",
+    "common_pattern": true
+  }
+}
