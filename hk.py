@@ -11,7 +11,7 @@ Algorithm:
   3. Fall back to difflib.SequenceMatcher (configurable threshold)
   4. Fall back to line-by-line fuzzy match (best contiguous block)
 
-Exit codes: 0=applied, 1=no match found, 2=ambiguous (multiple matches)
+Exit codes: 0=applied, 1=no match found, 2=ambiguous, 3=atomic rollback
 """
 
 import argparse
@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
@@ -1437,6 +1438,168 @@ def run_benchmark(benchmark_dir: str, threshold: float = 0.8, verbose: bool = Fa
     }
 
 
+# ── Backup / Undo infrastructure ─────────────────────────────────────────────
+
+BACKUP_DIR = os.path.join(".hk", "backups")
+MAX_BACKUPS = 50
+
+
+def _make_timestamp():
+    """Generate a sortable, unique timestamp string."""
+    t = time.time()
+    return time.strftime("%Y%m%d_%H%M%S", time.localtime(t)) + f"_{int(t * 1000000) % 1000000:06d}"
+
+
+def _safe_filename(file_path):
+    """Convert a file path to a safe filename for backup storage."""
+    name = os.path.abspath(file_path).lstrip('/').lstrip('\\')
+    return name.replace(os.sep, '_').replace('/', '_')
+
+
+def _save_backup(file_path, operation, content=None, timestamp=None):
+    """Save a backup before modifying a file.
+
+    Args:
+        file_path: Path to the file being modified.
+        operation: "edit", "create", or "overwrite".
+        content: Original file bytes (None for newly created files).
+        timestamp: Shared timestamp for atomic transactions.
+    Returns the timestamp used.
+    """
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    if timestamp is None:
+        timestamp = _make_timestamp()
+
+    safe_name = _safe_filename(file_path)
+    base = f"{timestamp}_{safe_name}"
+    bak_path = os.path.join(BACKUP_DIR, base + ".bak")
+    meta_path = os.path.join(BACKUP_DIR, base + ".meta")
+
+    with open(bak_path, 'wb') as f:
+        if content is not None:
+            f.write(content)
+
+    meta = {
+        "original_path": os.path.abspath(file_path),
+        "operation": operation,
+        "timestamp": timestamp,
+        "had_original": content is not None,
+    }
+    with open(meta_path, 'w') as f:
+        json.dump(meta, f, indent=2)
+
+    _auto_prune_backups()
+    return timestamp
+
+
+def _auto_prune_backups():
+    """Remove oldest backups when count exceeds MAX_BACKUPS."""
+    if not os.path.isdir(BACKUP_DIR):
+        return
+    meta_files = sorted(f for f in os.listdir(BACKUP_DIR) if f.endswith('.meta'))
+    while len(meta_files) > MAX_BACKUPS:
+        oldest = meta_files.pop(0)
+        base = oldest[:-5]
+        for ext in ('.meta', '.bak'):
+            p = os.path.join(BACKUP_DIR, base + ext)
+            if os.path.exists(p):
+                os.remove(p)
+
+
+def _list_backups():
+    """List all available backups, newest first."""
+    if not os.path.isdir(BACKUP_DIR):
+        return []
+    backups = []
+    for mf in sorted(
+        (f for f in os.listdir(BACKUP_DIR) if f.endswith('.meta')),
+        reverse=True,
+    ):
+        try:
+            with open(os.path.join(BACKUP_DIR, mf)) as f:
+                meta = json.load(f)
+            meta['_meta_file'] = mf
+            backups.append(meta)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return backups
+
+
+def _restore_backup(meta_file):
+    """Restore a single backup. Returns (success, message)."""
+    meta_path = os.path.join(BACKUP_DIR, meta_file)
+    try:
+        with open(meta_path) as f:
+            meta = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        return False, f"Failed to read backup metadata: {e}"
+
+    original_path = meta["original_path"]
+    had_original = meta.get("had_original", True)
+
+    base = meta_file[:-5]
+    bak_path = os.path.join(BACKUP_DIR, base + ".bak")
+
+    if not had_original:
+        # File was newly created — undo by deleting
+        if os.path.exists(original_path):
+            os.remove(original_path)
+    else:
+        if not os.path.exists(bak_path):
+            return False, f"Backup data missing: {bak_path}"
+        with open(bak_path, 'rb') as f:
+            content = f.read()
+        parent = os.path.dirname(original_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(original_path, 'wb') as f:
+            f.write(content)
+
+    # Clean up backup files
+    for p in (meta_path, bak_path):
+        if os.path.exists(p):
+            os.remove(p)
+
+    action = "Removed" if not had_original else "Restored"
+    return True, f"{action}: {original_path}"
+
+
+def _undo_latest():
+    """Undo the most recent backup. Returns (success, message)."""
+    backups = _list_backups()
+    if not backups:
+        return False, "No backups available"
+    return _restore_backup(backups[0]['_meta_file'])
+
+
+def _undo_all_transaction():
+    """Undo all backups sharing the most recent timestamp. Returns (success, results)."""
+    backups = _list_backups()
+    if not backups:
+        return False, "No backups available"
+    latest_ts = backups[0]['timestamp']
+    results = []
+    for b in backups:
+        if b['timestamp'] != latest_ts:
+            break
+        ok, msg = _restore_backup(b['_meta_file'])
+        results.append({"success": ok, "message": msg})
+    return True, results
+
+
+def _clean_backups():
+    """Remove all backup files. Returns count of files removed."""
+    if not os.path.isdir(BACKUP_DIR):
+        return 0
+    count = 0
+    for f in os.listdir(BACKUP_DIR):
+        p = os.path.join(BACKUP_DIR, f)
+        if os.path.isfile(p):
+            os.remove(p)
+            count += 1
+    return count
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hk",
@@ -1473,6 +1636,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Print unified diff to stderr",
     )
+    apply_parser.add_argument(
+        "--atomic",
+        action="store_true",
+        help="Atomic transaction: all edits succeed or all are rolled back",
+    )
 
     # Create command
     create_parser = sub.add_parser("create", help="Create a new file")
@@ -1498,6 +1666,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     bench_parser.add_argument("--threshold", type=float, default=0.8, help="Fuzzy match threshold")
     bench_parser.add_argument("--verbose", "-v", action="store_true", help="Show per-case details")
     bench_parser.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
+
+    # Undo command
+    undo_parser = sub.add_parser("undo", help="Undo recent edit(s)")
+    undo_parser.add_argument(
+        "--all", action="store_true",
+        help="Undo all edits from the last transaction",
+    )
+    undo_parser.add_argument(
+        "--list", action="store_true",
+        help="List available backups",
+    )
+    undo_parser.add_argument(
+        "--clean", action="store_true",
+        help="Remove all backups",
+    )
 
     args = parser.parse_args(argv)
 
@@ -1548,6 +1731,39 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print()
         return 0 if result['failed'] == 0 and result['errors'] == 0 else 1
 
+    if args.command == "undo":
+        if args.list:
+            backups = _list_backups()
+            if not backups:
+                print(json.dumps({"status": "empty", "message": "No backups available"}))
+                return 0
+            output = []
+            for b in backups:
+                output.append({
+                    "timestamp": b["timestamp"],
+                    "file": b["original_path"],
+                    "operation": b["operation"],
+                })
+            print(json.dumps(output, indent=2))
+            return 0
+        if args.clean:
+            count = _clean_backups()
+            print(json.dumps({"status": "cleaned", "removed": count}))
+            return 0
+        if args.all:
+            ok, results = _undo_all_transaction()
+            if not ok:
+                print(json.dumps({"status": "error", "error": results}))
+                return 1
+            print(json.dumps({"status": "restored", "results": results}, indent=2))
+            return 0
+        ok, msg = _undo_latest()
+        if not ok:
+            print(json.dumps({"status": "error", "error": msg}))
+            return 1
+        print(json.dumps({"status": "restored", "message": msg}))
+        return 0
+
     if args.command == "create":
         if args.stdin:
             raw = sys.stdin.read()
@@ -1566,11 +1782,25 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps({"status": "error", "error": "Must provide --content or --stdin"}))
             return 1
 
+        # Read original for backup before create
+        original_content = None
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                original_content = f.read()
+
         result = create_file(
             file_path, content,
             force=args.force,
             validate=args.validate,
         )
+
+        if result.status == "created":
+            _save_backup(
+                file_path,
+                "overwrite" if original_content is not None else "create",
+                content=original_content,
+            )
+
         print(json.dumps(result_to_dict(result), indent=2))
         return 0 if result.status == "created" else 1
 
@@ -1584,6 +1814,68 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps({"status": "error", "error": str(e)}))
         return 1
 
+    if args.atomic and not args.dry_run:
+        # ── Atomic mode: all edits succeed or all are rolled back ────
+        # Read and backup all target files in memory before any edits
+        file_backups = {}
+        for edit in edits:
+            fp = edit.get("file", "")
+            if fp and fp not in file_backups and os.path.exists(fp):
+                with open(fp, 'rb') as f:
+                    file_backups[fp] = f.read()
+
+        results = []
+        failed_idx = None
+
+        for i, edit in enumerate(edits):
+            file_path = edit.get("file", "")
+            old_text = edit.get("old_text", "")
+            new_text = edit.get("new_text", "")
+
+            result = apply_edit(
+                file_path, old_text, new_text,
+                threshold=args.threshold,
+                dry_run=False,
+                validate=args.validate,
+            )
+
+            if args.diff and result.diff:
+                print(result.diff, file=sys.stderr, end='')
+
+            results.append(result_to_dict(result))
+
+            if result.status != "applied":
+                failed_idx = i
+                break
+
+        if failed_idx is not None:
+            # ROLLBACK: restore all files from in-memory backups
+            for fp, content in file_backups.items():
+                with open(fp, 'wb') as f:
+                    f.write(content)
+
+            output = {
+                "status": "rolled_back",
+                "failed_edit_index": failed_idx,
+                "failed_edit": results[failed_idx],
+                "edits_attempted": len(results),
+                "edits_total": len(edits),
+            }
+            print(json.dumps(output, indent=2))
+            return 3
+
+        # All edits succeeded — save backups with shared timestamp
+        ts = _make_timestamp()
+        for fp, content in file_backups.items():
+            _save_backup(fp, "edit", content=content, timestamp=ts)
+
+        if len(results) == 1:
+            print(json.dumps(results[0], indent=2))
+        else:
+            print(json.dumps(results, indent=2))
+        return 0
+
+    # ── Non-atomic mode (default) ────────────────────────────────
     results = []
     exit_code = 0
 
@@ -1592,12 +1884,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         old_text = edit.get("old_text", "")
         new_text = edit.get("new_text", "")
 
+        # Read original for backup before edit
+        original_content = None
+        if not args.dry_run and os.path.exists(file_path):
+            with open(file_path, 'rb') as f:
+                original_content = f.read()
+
         result = apply_edit(
             file_path, old_text, new_text,
             threshold=args.threshold,
             dry_run=args.dry_run,
             validate=args.validate,
         )
+
+        # Save backup if edit was applied successfully
+        if result.status == "applied" and not args.dry_run and original_content is not None:
+            _save_backup(file_path, "edit", content=original_content)
 
         # Print diff to stderr if requested
         if args.diff and result.diff:

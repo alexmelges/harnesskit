@@ -217,8 +217,11 @@ class TestCLIMain(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.tmpdir)
 
     def tearDown(self):
+        os.chdir(self.original_cwd)
         import shutil
         shutil.rmtree(self.tmpdir)
 
@@ -342,8 +345,11 @@ class TestMultiEdit(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.tmpdir)
 
     def tearDown(self):
+        os.chdir(self.original_cwd)
         import shutil
         shutil.rmtree(self.tmpdir)
 
@@ -888,6 +894,284 @@ class TestBenchmarkCommand(unittest.TestCase):
         """Benchmark with missing dir should fail."""
         exit_code = hk.main(["benchmark", "--dir", "/nonexistent/path"])
         self.assertEqual(exit_code, 1)
+
+
+class TestAtomicTransactions(unittest.TestCase):
+    """Tests for --atomic flag on apply."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.tmpdir)
+
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def _write(self, name, content):
+        path = os.path.join(self.tmpdir, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def test_atomic_all_succeed(self):
+        """All edits succeed in atomic mode — files are modified."""
+        a = self._write("a.py", "aaa\n")
+        b = self._write("b.py", "bbb\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": b, "old_text": "bbb", "new_text": "BBB"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 0)
+        with open(a) as f:
+            self.assertEqual(f.read(), "AAA\n")
+        with open(b) as f:
+            self.assertEqual(f.read(), "BBB\n")
+
+    def test_atomic_middle_fails_rollback(self):
+        """Middle edit fails — ALL edits rolled back, exit code 3."""
+        a = self._write("a.py", "aaa\n")
+        b = self._write("b.py", "bbb\n")
+        c = self._write("c.py", "ccc\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": b, "old_text": "NOMATCH_xyz_longstring", "new_text": "BBB"},
+                {"file": c, "old_text": "ccc", "new_text": "CCC"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 3)
+        # All files should be restored to original
+        with open(a) as f:
+            self.assertEqual(f.read(), "aaa\n")
+        with open(b) as f:
+            self.assertEqual(f.read(), "bbb\n")
+        with open(c) as f:
+            self.assertEqual(f.read(), "ccc\n")
+
+    def test_atomic_first_fails_rollback(self):
+        """First edit fails — nothing changed, exit code 3."""
+        a = self._write("a.py", "aaa\n")
+        b = self._write("b.py", "bbb\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "NOMATCH_xyz_longstring", "new_text": "AAA"},
+                {"file": b, "old_text": "bbb", "new_text": "BBB"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 3)
+        with open(a) as f:
+            self.assertEqual(f.read(), "aaa\n")
+        with open(b) as f:
+            self.assertEqual(f.read(), "bbb\n")
+
+    def test_atomic_single_edit(self):
+        """Single edit with --atomic works normally."""
+        a = self._write("a.py", "hello\n")
+        code = main(["apply", "--file", a, "--old", "hello", "--new", "goodbye", "--atomic"])
+        self.assertEqual(code, 0)
+        with open(a) as f:
+            self.assertEqual(f.read(), "goodbye\n")
+
+    def test_atomic_with_dry_run(self):
+        """--atomic --dry-run doesn't modify files."""
+        a = self._write("a.py", "hello\n")
+        code = main(["apply", "--file", a, "--old", "hello", "--new", "goodbye",
+                      "--atomic", "--dry-run"])
+        self.assertEqual(code, 0)
+        with open(a) as f:
+            self.assertEqual(f.read(), "hello\n")
+
+    def test_atomic_rollback_output_format(self):
+        """Rolled-back atomic transaction outputs expected JSON."""
+        a = self._write("a.py", "aaa\n")
+        hk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hk.py")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": "/nonexistent/file.py", "old_text": "x", "new_text": "y"},
+            ]
+        })
+        result = subprocess.run(
+            [sys.executable, hk_path, "apply", "--stdin", "--atomic"],
+            input=edit_data,
+            capture_output=True,
+            text=True,
+            cwd=self.tmpdir,
+        )
+        self.assertEqual(result.returncode, 3)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["status"], "rolled_back")
+        self.assertIn("failed_edit_index", output)
+        self.assertIn("failed_edit", output)
+        self.assertIn("edits_attempted", output)
+        self.assertIn("edits_total", output)
+
+    def test_atomic_creates_backups_on_success(self):
+        """Successful atomic edits create backup entries with shared timestamp."""
+        a = self._write("a.py", "aaa\n")
+        b = self._write("b.py", "bbb\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": b, "old_text": "bbb", "new_text": "BBB"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 0)
+        backups = hk._list_backups()
+        self.assertEqual(len(backups), 2)
+        # All backups should share the same timestamp
+        timestamps = set(b["timestamp"] for b in backups)
+        self.assertEqual(len(timestamps), 1)
+
+    def test_atomic_no_backups_on_rollback(self):
+        """Rolled-back atomic transaction doesn't create backups."""
+        a = self._write("a.py", "aaa\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": a, "old_text": "NOMATCH_xyz_longstring", "new_text": "BBB"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 3)
+        backups = hk._list_backups()
+        self.assertEqual(len(backups), 0)
+
+
+class TestUndoSystem(unittest.TestCase):
+    """Tests for the undo subcommand."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.tmpdir)
+
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def _write(self, name, content):
+        path = os.path.join(self.tmpdir, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def test_undo_single_edit(self):
+        """Apply edit then undo — file restored to original."""
+        path = self._write("test.py", "hello\n")
+        code = main(["apply", "--file", path, "--old", "hello", "--new", "goodbye"])
+        self.assertEqual(code, 0)
+        with open(path) as f:
+            self.assertEqual(f.read(), "goodbye\n")
+        code = main(["undo"])
+        self.assertEqual(code, 0)
+        with open(path) as f:
+            self.assertEqual(f.read(), "hello\n")
+
+    def test_undo_list(self):
+        """List shows available backups after an edit."""
+        path = self._write("test.py", "hello\n")
+        main(["apply", "--file", path, "--old", "hello", "--new", "goodbye"])
+        backups = hk._list_backups()
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0]["operation"], "edit")
+
+    def test_undo_list_empty(self):
+        """List with no backups returns empty status."""
+        code = main(["undo", "--list"])
+        self.assertEqual(code, 0)
+
+    def test_undo_clean(self):
+        """Clean removes all backups."""
+        path = self._write("test.py", "hello\n")
+        main(["apply", "--file", path, "--old", "hello", "--new", "goodbye"])
+        self.assertGreater(len(hk._list_backups()), 0)
+        code = main(["undo", "--clean"])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(hk._list_backups()), 0)
+
+    def test_undo_auto_prune(self):
+        """Auto-prune removes oldest backups when limit exceeded."""
+        import time as time_mod
+        original_max = hk.MAX_BACKUPS
+        hk.MAX_BACKUPS = 3
+        try:
+            for i in range(5):
+                p = self._write(f"f{i}.py", f"old{i}\n")
+                hk._save_backup(p, "edit", content=f"old{i}\n".encode(),
+                                timestamp=hk._make_timestamp())
+                time_mod.sleep(0.01)
+            backups = hk._list_backups()
+            self.assertLessEqual(len(backups), 3)
+        finally:
+            hk.MAX_BACKUPS = original_max
+
+    def test_undo_after_create(self):
+        """Undo after create removes the newly created file."""
+        path = os.path.join(self.tmpdir, "brand_new.py")
+        code = main(["create", "--file", path, "--content", "x = 1\n"])
+        self.assertEqual(code, 0)
+        self.assertTrue(os.path.exists(path))
+        code = main(["undo"])
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(path))
+
+    def test_undo_after_create_force(self):
+        """Undo after force-create restores original file content."""
+        path = self._write("exist.py", "original\n")
+        code = main(["create", "--file", path, "--content", "overwritten\n", "--force"])
+        self.assertEqual(code, 0)
+        with open(path) as f:
+            self.assertEqual(f.read(), "overwritten\n")
+        code = main(["undo"])
+        self.assertEqual(code, 0)
+        with open(path) as f:
+            self.assertEqual(f.read(), "original\n")
+
+    def test_undo_no_backups(self):
+        """Undo with no backups returns error."""
+        code = main(["undo"])
+        self.assertEqual(code, 1)
+
+    def test_undo_all_transaction(self):
+        """Undo --all restores all files from the last atomic transaction."""
+        a = self._write("a.py", "aaa\n")
+        b = self._write("b.py", "bbb\n")
+        edit_data = json.dumps({
+            "edits": [
+                {"file": a, "old_text": "aaa", "new_text": "AAA"},
+                {"file": b, "old_text": "bbb", "new_text": "BBB"},
+            ]
+        })
+        edit_path = self._write("edits.json", edit_data)
+        code = main(["apply", "--edit", edit_path, "--atomic"])
+        self.assertEqual(code, 0)
+        with open(a) as f:
+            self.assertEqual(f.read(), "AAA\n")
+        with open(b) as f:
+            self.assertEqual(f.read(), "BBB\n")
+        code = main(["undo", "--all"])
+        self.assertEqual(code, 0)
+        with open(a) as f:
+            self.assertEqual(f.read(), "aaa\n")
+        with open(b) as f:
+            self.assertEqual(f.read(), "bbb\n")
 
 
 if __name__ == "__main__":
