@@ -180,6 +180,25 @@ Response:
 }
 ```
 
+## Examples
+
+The [`examples/`](examples/) directory contains complete, working integration examples:
+
+| Example | Description |
+|---|---|
+| [`claude_agent.py`](examples/claude_agent.py) | Full Claude `tool_use` agent loop — give it a task and files, it edits them |
+| [`openai_agent.py`](examples/openai_agent.py) | Same pattern with OpenAI function calling |
+| [`batch_edit.py`](examples/batch_edit.py) | Apply edits from JSON or XML files (with `--dry-run` and `--validate`) |
+
+```bash
+# Claude agent: "add type hints to all functions in src/"
+python examples/claude_agent.py --task "Add type hints" --files src/
+
+# Batch edits from XML (natural LLM output)
+echo '<edits><edit file="app.py"><old>def foo():</old><new>def foo() -> None:</new></edit></edits>' \
+  | python examples/batch_edit.py --validate
+```
+
 ## Integration
 
 HarnessKit is designed to slot into any agent framework as the edit backend:
