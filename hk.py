@@ -1358,6 +1358,85 @@ def parse_edit_input(args) -> List[dict]:
     )
 
 
+def run_benchmark(benchmark_dir: str, threshold: float = 0.8, verbose: bool = False) -> dict:
+    """Run the benchmark suite and return results."""
+    import glob
+    import tempfile
+    import shutil
+
+    cases = sorted(glob.glob(os.path.join(benchmark_dir, "*.json")))
+    if not cases:
+        return {"error": f"No benchmark files found in {benchmark_dir}"}
+
+    passed = 0
+    failed = 0
+    errors = 0
+    results = []
+
+    for case_path in cases:
+        name = os.path.basename(case_path)
+        try:
+            with open(case_path) as f:
+                case = json.loads(f.read())
+        except (json.JSONDecodeError, OSError) as e:
+            errors += 1
+            results.append({"file": name, "status": "error", "error": str(e)})
+            continue
+
+        original = case.get("original", "")
+        edit = case.get("llm_edit", {})
+        expected = case.get("expected", "")
+        old_text = edit.get("old_text", "")
+        new_text = edit.get("new_text", "")
+
+        # Write original to temp file
+        tmpdir = tempfile.mkdtemp()
+        try:
+            # Determine extension from metadata
+            lang = case.get("metadata", {}).get("language", "txt")
+            ext_map = {"python": ".py", "rust": ".rs", "javascript": ".js", "typescript": ".ts",
+                       "go": ".go", "java": ".java", "ruby": ".rb", "cpp": ".cpp", "c": ".c",
+                       "css": ".css", "html": ".html", "yaml": ".yaml", "json": ".json",
+                       "toml": ".toml", "sql": ".sql", "swift": ".swift", "kotlin": ".kt"}
+            ext = ext_map.get(lang, f".{lang}")
+            tmp_file = os.path.join(tmpdir, f"test{ext}")
+
+            with open(tmp_file, "w", newline="") as f:
+                f.write(original)
+
+            result = apply_edit(tmp_file, old_text, new_text, threshold=threshold)
+
+            if result.status in ("applied", "fuzzy_applied"):
+                with open(tmp_file, newline="") as f:
+                    actual = f.read()
+                if actual == expected:
+                    passed += 1
+                    results.append({"file": name, "status": "pass", "match": result.status})
+                else:
+                    failed += 1
+                    entry: dict = {"file": name, "status": "fail", "reason": "output mismatch"}
+                    if verbose:
+                        entry["expected_len"] = len(expected)
+                        entry["actual_len"] = len(actual)
+                    results.append(entry)
+            else:
+                failed += 1
+                results.append({"file": name, "status": "fail", "reason": result.status})
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    total = passed + failed + errors
+    return {
+        "total": total,
+        "passed": passed,
+        "failed": failed,
+        "errors": errors,
+        "pass_rate": round(passed / total * 100, 1) if total > 0 else 0,
+        "threshold": threshold,
+        "details": results if verbose else None,
+    }
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hk",
@@ -1413,6 +1492,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     validate_parser = sub.add_parser("validate", help="Validate a file's syntax")
     validate_parser.add_argument("file", help="File to validate")
 
+    # Benchmark command
+    bench_parser = sub.add_parser("benchmark", help="Run the benchmark suite")
+    bench_parser.add_argument("--dir", default=None, help="Benchmark directory (default: bundled benchmarks/)")
+    bench_parser.add_argument("--threshold", type=float, default=0.8, help="Fuzzy match threshold")
+    bench_parser.add_argument("--verbose", "-v", action="store_true", help="Show per-case details")
+    bench_parser.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
+
     args = parser.parse_args(argv)
 
     if args.command == "validate":
@@ -1428,6 +1514,39 @@ def main(argv: Optional[List[str]] = None) -> int:
             result["error"] = err
         print(json.dumps(result, indent=2))
         return 0 if valid else 1
+
+    if args.command == "benchmark":
+        bench_dir = args.dir
+        if not bench_dir:
+            # Look for benchmarks/ relative to this script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            bench_dir = os.path.join(script_dir, "benchmarks")
+        if not os.path.isdir(bench_dir):
+            print(json.dumps({"error": f"Benchmark directory not found: {bench_dir}"}))
+            return 1
+        result = run_benchmark(bench_dir, threshold=args.threshold, verbose=args.verbose)
+        if args.json_output:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"\n{'='*50}")
+            print(f"  HarnessKit Benchmark Results")
+            print(f"{'='*50}")
+            print(f"  Cases:     {result['total']}")
+            print(f"  Passed:    {result['passed']} ✅")
+            if result['failed']:
+                print(f"  Failed:    {result['failed']} ❌")
+            if result['errors']:
+                print(f"  Errors:    {result['errors']} ⚠️")
+            print(f"  Pass rate: {result['pass_rate']}%")
+            print(f"  Threshold: {result['threshold']}")
+            print(f"{'='*50}\n")
+            if args.verbose and result.get('details'):
+                for d in result['details']:
+                    icon = "✅" if d['status'] == 'pass' else "❌" if d['status'] == 'fail' else "⚠️"
+                    extra = f" ({d.get('reason', d.get('match', ''))})" if d['status'] != 'pass' else ""
+                    print(f"  {icon} {d['file']}{extra}")
+                print()
+        return 0 if result['failed'] == 0 and result['errors'] == 0 else 1
 
     if args.command == "create":
         if args.stdin:
@@ -1499,5 +1618,5 @@ def main(argv: Optional[List[str]] = None) -> int:
     return exit_code
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

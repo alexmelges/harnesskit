@@ -861,5 +861,34 @@ class TestCSSTokenMapping(unittest.TestCase):
         self.assertIn("blue", content)
 
 
+class TestBenchmarkCommand(unittest.TestCase):
+    """Test the benchmark subcommand."""
+
+    def test_benchmark_runs(self):
+        """Benchmark command should run and report results."""
+        bench_dir = os.path.join(os.path.dirname(__file__), "benchmarks")
+        if not os.path.isdir(bench_dir):
+            self.skipTest("No benchmarks/ directory")
+        result = hk.run_benchmark(bench_dir)
+        self.assertIn("total", result)
+        self.assertIn("passed", result)
+        self.assertIn("pass_rate", result)
+        self.assertGreater(result["total"], 0)
+        self.assertEqual(result["pass_rate"], 100.0)
+
+    def test_benchmark_cli_json(self):
+        """Benchmark CLI should output JSON."""
+        bench_dir = os.path.join(os.path.dirname(__file__), "benchmarks")
+        if not os.path.isdir(bench_dir):
+            self.skipTest("No benchmarks/ directory")
+        exit_code = hk.main(["benchmark", "--json"])
+        self.assertEqual(exit_code, 0)
+
+    def test_benchmark_missing_dir(self):
+        """Benchmark with missing dir should fail."""
+        exit_code = hk.main(["benchmark", "--dir", "/nonexistent/path"])
+        self.assertEqual(exit_code, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
