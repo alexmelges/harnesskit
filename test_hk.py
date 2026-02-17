@@ -384,6 +384,130 @@ class TestMultiEdit(unittest.TestCase):
         self.assertEqual(code, 1)
 
 
+class TestXMLInput(unittest.TestCase):
+    """Test XML edit input format."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def _write(self, name, content):
+        path = os.path.join(self.tmpdir, name)
+        with open(path, 'w') as f:
+            f.write(content)
+        return path
+
+    def test_xml_single_edit_stdin(self):
+        target = self._write("test.py", "def hello():\n    pass\n")
+        xml_input = f'<edit file="{target}"><old>def hello():</old><new>def hello(name="world"):</new></edit>'
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input=xml_input,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["status"], "applied")
+        with open(target) as f:
+            self.assertIn('def hello(name="world"):', f.read())
+
+    def test_xml_multi_edit_stdin(self):
+        target_a = self._write("a.py", "aaa\n")
+        target_b = self._write("b.py", "bbb\n")
+        xml_input = f'''<edits>
+  <edit file="{target_a}"><old>aaa</old><new>AAA</new></edit>
+  <edit file="{target_b}"><old>bbb</old><new>BBB</new></edit>
+</edits>'''
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input=xml_input,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        with open(target_a) as f:
+            self.assertEqual(f.read(), "AAA\n")
+        with open(target_b) as f:
+            self.assertEqual(f.read(), "BBB\n")
+
+    def test_xml_edit_file(self):
+        target = self._write("test.py", "old code\n")
+        xml_content = f'<edit file="{target}"><old>old code</old><new>new code</new></edit>'
+        edit_file = self._write("edits.xml", xml_content)
+        code = main(["apply", "--edit", edit_file])
+        self.assertEqual(code, 0)
+        with open(target) as f:
+            self.assertEqual(f.read(), "new code\n")
+
+    def test_xml_multiline_edit(self):
+        target = self._write("test.py", "def foo():\n    x = 1\n    return x\n")
+        xml_input = f'''<edit file="{target}">
+<old>
+def foo():
+    x = 1
+    return x
+</old>
+<new>
+def foo(multiplier=1):
+    x = 1 * multiplier
+    return x
+</new>
+</edit>'''
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input=xml_input,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        with open(target) as f:
+            content = f.read()
+            self.assertIn("multiplier", content)
+
+    def test_xml_missing_file_attr(self):
+        xml_input = '<edit><old>x</old><new>y</new></edit>'
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input=xml_input,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_xml_path_attr_alias(self):
+        """Test that 'path' attribute works as alias for 'file'."""
+        target = self._write("test.py", "hello\n")
+        xml_input = f'<edit path="{target}"><old>hello</old><new>goodbye</new></edit>'
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input=xml_input,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertEqual(result.returncode, 0)
+        with open(target) as f:
+            self.assertEqual(f.read(), "goodbye\n")
+
+    def test_xml_invalid_format(self):
+        result = subprocess.run(
+            [sys.executable, "hk.py", "apply", "--stdin"],
+            input="<broken xml",
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        self.assertNotEqual(result.returncode, 0)
+
+
 class TestOutputFormat(unittest.TestCase):
     """Test that CLI output is valid JSON with expected fields."""
 

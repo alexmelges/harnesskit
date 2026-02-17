@@ -1241,20 +1241,114 @@ def result_to_dict(result: EditResult) -> dict:
     return d
 
 
+def _parse_xml_edits(raw: str) -> List[dict]:
+    """Parse edits from XML format.
+
+    Accepts either a single <edit> or multiple <edits><edit>...</edit></edits>.
+    Each <edit> element should have a 'file' attribute and <old>/<new> children.
+
+    Example:
+        <edit file="src/app.py">
+          <old>def hello():</old>
+          <new>def hello(name="world"):</new>
+        </edit>
+
+    Or wrapped:
+        <edits>
+          <edit file="src/app.py">
+            <old>def hello():</old>
+            <new>def hello(name="world"):</new>
+          </edit>
+        </edits>
+    """
+    # Wrap in root if it's bare <edit> tags (multiple siblings)
+    stripped = raw.strip()
+    if not stripped.startswith('<edits'):
+        # Could be single <edit> or multiple bare <edit> elements
+        stripped = f'<edits>{stripped}</edits>'
+
+    try:
+        root = ET.fromstring(stripped)
+    except ET.ParseError as e:
+        raise ValueError(f"Invalid XML edit format: {e}")
+
+    edits = []
+    for elem in root.iter('edit'):
+        file_path = elem.get('file') or elem.get('path')
+        if not file_path:
+            raise ValueError("<edit> element must have a 'file' attribute")
+
+        old_el = elem.find('old')
+        new_el = elem.find('new')
+        if old_el is None or new_el is None:
+            raise ValueError(
+                f"<edit file=\"{file_path}\"> must have <old> and <new> children"
+            )
+
+        # Use .text with fallback to empty string; preserve internal XML text
+        old_text = (old_el.text or '')
+        new_text = (new_el.text or '')
+
+        # Strip leading/trailing newline from text content (common in XML)
+        if old_text.startswith('\n'):
+            old_text = old_text[1:]
+        if old_text.endswith('\n'):
+            old_text = old_text[:-1]
+        if new_text.startswith('\n'):
+            new_text = new_text[1:]
+        if new_text.endswith('\n'):
+            new_text = new_text[:-1]
+
+        edits.append({
+            "file": file_path,
+            "old_text": old_text,
+            "new_text": new_text,
+        })
+
+    if not edits:
+        raise ValueError("No <edit> elements found in XML input")
+
+    return edits
+
+
+def _detect_format(raw: str) -> str:
+    """Detect whether input is JSON or XML."""
+    stripped = raw.strip()
+    if stripped.startswith('{') or stripped.startswith('['):
+        return 'json'
+    if stripped.startswith('<'):
+        return 'xml'
+    # Try JSON first, fall back to XML
+    return 'json'
+
+
+def _parse_raw_input(raw: str) -> List[dict]:
+    """Parse raw string input, auto-detecting JSON or XML format."""
+    fmt = _detect_format(raw)
+    if fmt == 'xml':
+        return _parse_xml_edits(raw)
+    # JSON
+    data = json.loads(raw)
+    if isinstance(data, list):
+        return data
+    if "edits" in data:
+        return data["edits"]
+    return [data]
+
+
 def parse_edit_input(args) -> List[dict]:
-    """Parse edit instructions from CLI args or stdin."""
+    """Parse edit instructions from CLI args, stdin, or file.
+
+    Supports JSON and XML formats, auto-detected from content.
+    """
     if args.stdin:
-        data = json.load(sys.stdin)
-        if "edits" in data:
-            return data["edits"]
-        return [data]
+        raw = sys.stdin.read()
+        return _parse_raw_input(raw)
 
     if args.edit:
         with open(args.edit, 'r') as f:
-            data = json.load(f)
-        if "edits" in data:
-            return data["edits"]
-        return [data]
+            raw = f.read()
+        return _parse_raw_input(raw)
 
     if args.file and args.old is not None and args.new is not None:
         return [{"file": args.file, "old_text": args.old, "new_text": args.new}]

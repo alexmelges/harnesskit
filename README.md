@@ -51,6 +51,12 @@ echo '{"file": "app.py", "old_text": "def hello():", "new_text": "def greet():"}
 # From a JSON file
 hk apply --edit changes.json
 
+# XML format (natural for Claude and other LLMs)
+echo '<edit file="app.py"><old>def hello():</old><new>def greet():</new></edit>' | hk apply --stdin
+
+# XML from file
+hk apply --edit changes.xml
+
 # Dry run — see what would change without writing
 hk apply --file app.py --old "..." --new "..." --dry-run
 ```
@@ -75,6 +81,30 @@ Batch multiple edits:
   ]
 }
 ```
+
+### XML Edit Format
+
+HarnessKit auto-detects XML input — ideal for LLMs that naturally output XML:
+
+```xml
+<edit file="path/to/file.py">
+  <old>def hello():
+    print('hi')</old>
+  <new>def hello():
+    print('hello world')</new>
+</edit>
+```
+
+Batch multiple edits:
+
+```xml
+<edits>
+  <edit file="a.py"><old>...</old><new>...</new></edit>
+  <edit file="b.py"><old>...</old><new>...</new></edit>
+</edits>
+```
+
+The `path` attribute works as an alias for `file`.
 
 ### Output
 
