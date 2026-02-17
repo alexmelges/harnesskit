@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "whitespace_mismatch",
+    "language": "typescript",
+    "difficulty": 2,
+    "description": "TypeScript enum with inconsistent spacing around equals"
+  },
+  "original": "enum Status {\n  Active  = 'active',\n  Paused  = 'paused',\n  Deleted = 'deleted',\n}\n",
+  "llm_edit": {
+    "old_text": "enum Status {\n  Active = 'active',\n  Paused = 'paused',\n  Deleted = 'deleted',\n}",
+    "new_text": "enum Status {\n  Active = 'active',\n  Paused = 'paused',\n  Deleted = 'deleted',\n  Archived = 'archived',\n}"
+  },
+  "expected": "enum Status {\n  Active  = 'active',\n  Paused  = 'paused',\n  Deleted = 'deleted',\n  Archived = 'archived',\n}\n"
+}

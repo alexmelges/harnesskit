@@ -225,25 +225,78 @@ result = apply_edit("app.py", old_text, new_text, threshold=0.8)
 
 ## Benchmarks
 
-We tested HarnessKit against **42 realistic edit failure scenarios** across 6 categories — the kind that break `str_replace` and `apply_patch` in production agent workflows.
+We tested HarnessKit against **50 realistic edit failure scenarios** across 6 categories — the kind that break `str_replace` and `apply_patch` in production agent workflows.
 
 | Category | Cases | Pass Rate | Avg Confidence |
 |---|---|---|---|
-| **Whitespace Mismatch** (tabs/spaces, trailing, CRLF, vendor prefixes, commas) | 11 | **100%** | 0.950 |
-| **Stale Context** (renames, decorators, type changes, docstrings) | 11 | **100%** | 0.937 |
-| **Partial Match** (incomplete blocks, missing context) | 6 | **100%** | 1.000 |
-| **Indentation Drift** (mixed tabs/spaces, YAML, Makefile) | 6 | **100%** | 0.950 |
+| **Whitespace Mismatch** (tabs/spaces, trailing, CRLF, vendor prefixes, commas) | 12 | **100%** | 0.950 |
+| **Stale Context** (renames, decorators, type changes, docstrings, hooks) | 13 | **100%** | 0.937 |
+| **Partial Match** (incomplete blocks, missing context, shell scripts) | 7 | **100%** | 1.000 |
+| **Indentation Drift** (mixed tabs/spaces, YAML, Makefile, class methods) | 7 | **100%** | 0.950 |
 | **Line Number Off** (shifted imports, functions, comments) | 4 | **100%** | 1.000 |
-| **Encoding Issues** (Unicode, BOM, invisible chars, CRLF) | 4 | **100%** | 1.000 |
-| **Total** | **42** | **100%** | **0.964** |
+| **Encoding Issues** (Unicode, BOM, invisible chars, CRLF, smart quotes) | 5 | **100%** | 1.000 |
+| **Total** | **50** | **100%** | **0.960** |
 
-> **42/42 benchmarks passing.** Covers Python, TypeScript, Rust, Go, Java, Ruby, CSS, HTML, YAML, Makefile, and more.
+> **50/50 benchmarks passing.** Covers Python, TypeScript, Rust, Go, Java, Ruby, CSS, HTML, YAML, Makefile, Bash, and more.
 
 Run the benchmarks yourself:
 
 ```bash
 python3 benchmarks/run_benchmarks.py
 ```
+
+## GitHub Action
+
+Use HarnessKit in your CI/CD pipelines:
+
+```yaml
+- name: Apply fuzzy edit
+  uses: alexmelges/harnesskit@v0.5
+  with:
+    edit-file: changes.json
+    validate: true
+    atomic: true
+```
+
+Or inline:
+
+```yaml
+- name: Apply edit
+  uses: alexmelges/harnesskit@v0.5
+  with:
+    edit-json: '{"file": "src/config.py", "old_text": "DEBUG = True", "new_text": "DEBUG = False"}'
+```
+
+The action outputs `status`, `confidence`, and `match-type` for downstream steps.
+
+## Pre-commit Hook
+
+Add syntax validation to your pre-commit workflow:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/alexmelges/harnesskit
+    rev: v0.5.0
+    hooks:
+      - id: harnesskit-validate
+```
+
+## How HarnessKit Compares
+
+| Feature | HarnessKit | `str_replace` (Anthropic) | `apply_patch` (OpenAI) | SWE-bench harness |
+|---|---|---|---|---|
+| **Fuzzy matching** | ✅ 4-stage cascade | ❌ Exact only | ❌ Line numbers | ❌ N/A |
+| **Dependencies** | Zero (stdlib) | N/A (built-in) | N/A (built-in) | Heavy |
+| **Single file** | ✅ ~1300 LOC | N/A | N/A | ❌ |
+| **Confidence score** | ✅ Per-edit | ❌ | ❌ | ❌ |
+| **Syntax validation** | ✅ + auto-rollback | ❌ | ❌ | ❌ |
+| **Undo/rollback** | ✅ Atomic | ❌ | ❌ | ❌ |
+| **MCP server** | ✅ Built-in | ❌ | ❌ | ❌ |
+| **Model-agnostic** | ✅ Any LLM | Claude only | GPT only | N/A |
+| **XML + JSON input** | ✅ Auto-detect | ❌ | ❌ | ❌ |
+
+**TL;DR:** HarnessKit is what `str_replace` and `apply_patch` should have been — tolerant of the imprecision that every LLM exhibits.
 
 ## Design Principles
 
@@ -325,12 +378,31 @@ echo 'print("hello")' | hk create --file hello.py --stdin
 | `--diff` | `false` | Print unified diff to stderr |
 | `--force` | `false` | Overwrite existing file (create command) |
 
+## Human-Friendly Output
+
+When running in a terminal, HarnessKit auto-detects TTY and shows colored, readable output:
+
+```bash
+$ hk apply --file app.py --old "x = 1" --new "x = 2"
+✅ app.py
+   Match: exact (100.0% confidence)
+
+$ hk apply --file app.py --old "def foo" --new "def bar" --diff
+✅ app.py
+   Match: fuzzy (92.3% confidence)
+   -def foo():
+   +def bar():
+```
+
+Force JSON output (for scripts): `--format json`
+Force human output (for pipes): `--format human`
+
 ## Development
 
 ```bash
 git clone https://github.com/alexmelges/harnesskit.git
 cd harnesskit
-python3 -m pytest test_hk.py test_mcp.py -v  # 86 tests
+python3 -m pytest test_hk.py test_mcp.py test_wrapper.py -v  # 137 tests
 ```
 
 ## License

@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "indentation_drift",
+    "language": "python",
+    "difficulty": 3,
+    "description": "Class method with 4-space indent in LLM output but 2-space in file"
+  },
+  "original": "class Config:\n  def __init__(self):\n    self.debug = False\n    self.verbose = True\n",
+  "llm_edit": {
+    "old_text": "class Config:\n    def __init__(self):\n        self.debug = False\n        self.verbose = True",
+    "new_text": "class Config:\n    def __init__(self):\n        self.debug = False\n        self.verbose = True\n        self.log_level = \"INFO\""
+  },
+  "expected": "class Config:\n  def __init__(self):\n    self.debug = False\n    self.verbose = True\n    self.log_level = \"INFO\"\n"
+}

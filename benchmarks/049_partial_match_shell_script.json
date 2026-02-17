@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "partial_match",
+    "language": "bash",
+    "difficulty": 3,
+    "description": "Shell script with partial function match"
+  },
+  "original": "#!/bin/bash\nset -euo pipefail\n\nDATABASE_URL=\"postgres://localhost:5432/mydb\"\n\nfunction migrate() {\n    echo \"Running migrations...\"\n    psql \"$DATABASE_URL\" -f migrations/up.sql\n    echo \"Done.\"\n}\n\nfunction seed() {\n    echo \"Seeding database...\"\n    psql \"$DATABASE_URL\" -f seeds/data.sql\n}\n\nmigrate\n",
+  "llm_edit": {
+    "old_text": "function migrate() {\n    echo \"Running migrations...\"\n    psql \"$DATABASE_URL\" -f migrations/up.sql\n    echo \"Done.\"\n}",
+    "new_text": "function migrate() {\n    echo \"Running migrations...\"\n    psql \"$DATABASE_URL\" -f migrations/up.sql\n    echo \"Running rollback check...\"\n    psql \"$DATABASE_URL\" -f migrations/verify.sql\n    echo \"Done.\"\n}"
+  },
+  "expected": "#!/bin/bash\nset -euo pipefail\n\nDATABASE_URL=\"postgres://localhost:5432/mydb\"\n\nfunction migrate() {\n    echo \"Running migrations...\"\n    psql \"$DATABASE_URL\" -f migrations/up.sql\n    echo \"Running rollback check...\"\n    psql \"$DATABASE_URL\" -f migrations/verify.sql\n    echo \"Done.\"\n}\n\nfunction seed() {\n    echo \"Seeding database...\"\n    psql \"$DATABASE_URL\" -f seeds/data.sql\n}\n\nmigrate\n"
+}

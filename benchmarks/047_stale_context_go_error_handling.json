@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "stale_context",
+    "language": "go",
+    "difficulty": 3,
+    "description": "Go error handling pattern changed but LLM has old version"
+  },
+  "original": "func readConfig(path string) (*Config, error) {\n\tdata, err := os.ReadFile(path)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"reading config: %w\", err)\n\t}\n\tvar cfg Config\n\terr = json.Unmarshal(data, &cfg)\n\treturn &cfg, err\n}\n",
+  "llm_edit": {
+    "old_text": "func readConfig(path string) (*Config, error) {\n\tdata, err := ioutil.ReadFile(path)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tvar cfg Config\n\terr = json.Unmarshal(data, &cfg)\n\treturn &cfg, err\n}",
+    "new_text": "func readConfig(path string) (*Config, error) {\n\tdata, err := ioutil.ReadFile(path)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tvar cfg Config\n\tif err = json.Unmarshal(data, &cfg); err != nil {\n\t\treturn nil, fmt.Errorf(\"parsing config: %w\", err)\n\t}\n\treturn &cfg, nil\n}"
+  },
+  "expected": "func readConfig(path string) (*Config, error) {\n\tdata, err := os.ReadFile(path)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"reading config: %w\", err)\n\t}\n\tvar cfg Config\n\tif err = json.Unmarshal(data, &cfg); err != nil {\n\t\treturn nil, fmt.Errorf(\"parsing config: %w\", err)\n\t}\n\treturn &cfg, nil\n}\n"
+}

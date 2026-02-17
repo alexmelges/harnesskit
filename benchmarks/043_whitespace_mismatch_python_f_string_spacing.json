@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "whitespace_mismatch",
+    "language": "python",
+    "difficulty": 2,
+    "description": "Python with extra internal spaces - unchanged lines preserve whitespace"
+  },
+  "original": "def  process( data,  flag=True ):\n    result  =  transform( data )\n    return  result\n",
+  "llm_edit": {
+    "old_text": "def process(data, flag=True):\n    result = transform(data)\n    return result",
+    "new_text": "def process(data, flag=True):\n    result = transform(data)\n    if result:\n        log(result)\n    return result"
+  },
+  "expected": "def  process( data,  flag=True ):\n    result  =  transform( data )\n    if result:\n        log(result)\n    return  result\n"
+}

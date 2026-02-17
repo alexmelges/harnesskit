@@ -1,0 +1,94 @@
+name: 'HarnessKit Fuzzy Edit'
+description: 'Apply fuzzy edits to files using HarnessKit — tolerant of LLM imprecision'
+author: 'Alex Melges'
+
+branding:
+  icon: 'edit-3'
+  color: 'orange'
+
+inputs:
+  edit-file:
+    description: 'Path to JSON/XML edit file'
+    required: false
+  edit-json:
+    description: 'Inline JSON edit instruction'
+    required: false
+  threshold:
+    description: 'Fuzzy match threshold (0.0-1.0)'
+    required: false
+    default: '0.8'
+  validate:
+    description: 'Validate syntax after edit (rollback on failure)'
+    required: false
+    default: 'false'
+  atomic:
+    description: 'Atomic mode: all edits succeed or all roll back'
+    required: false
+    default: 'false'
+  dry-run:
+    description: 'Preview changes without writing'
+    required: false
+    default: 'false'
+  diff:
+    description: 'Show unified diff output'
+    required: false
+    default: 'true'
+
+outputs:
+  result:
+    description: 'JSON result of the edit operation'
+  status:
+    description: 'Status: applied, no_match, ambiguous, error, validation_error'
+  confidence:
+    description: 'Match confidence score (0.0-1.0)'
+  match-type:
+    description: 'How the match was found: exact, whitespace, fuzzy, line_fuzzy'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install HarnessKit
+      shell: bash
+      run: pip install harnesskit
+
+    - name: Apply Edit
+      id: apply
+      shell: bash
+      run: |
+        ARGS="apply"
+        if [ -n "${{ inputs.edit-file }}" ]; then
+          ARGS="$ARGS --edit ${{ inputs.edit-file }}"
+        elif [ -n "${{ inputs.edit-json }}" ]; then
+          ARGS="$ARGS --stdin"
+        fi
+
+        [ "${{ inputs.validate }}" = "true" ] && ARGS="$ARGS --validate"
+        [ "${{ inputs.atomic }}" = "true" ] && ARGS="$ARGS --atomic"
+        [ "${{ inputs.dry-run }}" = "true" ] && ARGS="$ARGS --dry-run"
+        [ "${{ inputs.diff }}" = "true" ] && ARGS="$ARGS --diff"
+        ARGS="$ARGS --threshold ${{ inputs.threshold }}"
+
+        if [ -n "${{ inputs.edit-json }}" ]; then
+          RESULT=$(echo '${{ inputs.edit-json }}' | hk $ARGS 2>&1) || true
+        else
+          RESULT=$(hk $ARGS 2>&1) || true
+        fi
+
+        echo "result<<EOF" >> $GITHUB_OUTPUT
+        echo "$RESULT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        # Extract status and confidence
+        STATUS=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
+        CONFIDENCE=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('confidence',''))" 2>/dev/null || echo "")
+        MATCH_TYPE=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('match_type',''))" 2>/dev/null || echo "")
+
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "confidence=$CONFIDENCE" >> $GITHUB_OUTPUT
+        echo "match-type=$MATCH_TYPE" >> $GITHUB_OUTPUT
+
+        # Fail the step if edit failed
+        if [ "$STATUS" = "no_match" ] || [ "$STATUS" = "error" ]; then
+          echo "::error::HarnessKit edit failed: $STATUS"
+          exit 1
+        fi

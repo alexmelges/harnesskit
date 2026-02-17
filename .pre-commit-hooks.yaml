@@ -1,0 +1,7 @@
+- id: harnesskit-validate
+  name: HarnessKit Syntax Validation
+  description: Validate file syntax using HarnessKit
+  entry: hk validate
+  language: python
+  types_or: [python, json, xml, yaml, javascript, ts]
+  additional_dependencies: ['harnesskit']

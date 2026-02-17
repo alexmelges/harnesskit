@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "stale_context",
+    "language": "css",
+    "difficulty": 3,
+    "description": "CSS grid layout with renamed class"
+  },
+  "original": ".main-grid {\n  display: grid;\n  grid-template-columns: 1fr 2fr;\n  gap: 16px;\n  padding: 20px;\n}\n",
+  "llm_edit": {
+    "old_text": ".grid-container {\n  display: grid;\n  grid-template-columns: 1fr 2fr;\n  gap: 16px;\n  padding: 20px;\n}",
+    "new_text": ".grid-container {\n  display: grid;\n  grid-template-columns: 1fr 2fr 1fr;\n  gap: 16px;\n  padding: 20px;\n  max-width: 1200px;\n}"
+  },
+  "expected": ".main-grid {\n  display: grid;\n  grid-template-columns: 1fr 2fr 1fr;\n  gap: 16px;\n  padding: 20px;\n  max-width: 1200px;\n}\n"
+}

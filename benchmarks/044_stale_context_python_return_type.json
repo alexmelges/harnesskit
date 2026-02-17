@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "category": "stale_context",
+    "language": "python",
+    "difficulty": 3,
+    "description": "LLM has old return type but file was updated"
+  },
+  "original": "def get_users(db) -> list[User]:\n    query = \"SELECT * FROM users\"\n    rows = db.execute(query)\n    return [User(**r) for r in rows]\n",
+  "llm_edit": {
+    "old_text": "def get_users(db) -> List[User]:\n    query = \"SELECT * FROM users\"\n    rows = db.execute(query)\n    return [User(**r) for r in rows]",
+    "new_text": "def get_users(db, active_only=False) -> List[User]:\n    query = \"SELECT * FROM users\"\n    if active_only:\n        query += \" WHERE active = true\"\n    rows = db.execute(query)\n    return [User(**r) for r in rows]"
+  },
+  "expected": "def get_users(db, active_only=False) -> list[User]:\n    query = \"SELECT * FROM users\"\n    if active_only:\n        query += \" WHERE active = true\"\n    rows = db.execute(query)\n    return [User(**r) for r in rows]\n"
+}

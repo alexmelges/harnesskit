@@ -1600,6 +1600,78 @@ def _clean_backups():
     return count
 
 
+def _is_tty() -> bool:
+    """Check if stdout is a terminal."""
+    return hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+
+
+def _color(text: str, code: str) -> str:
+    """Wrap text in ANSI color codes if stdout is a TTY."""
+    if not _is_tty():
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def _format_human_result(result: dict) -> str:
+    """Format an edit result for human-readable terminal output."""
+    status = result.get("status", "unknown")
+    file_path = result.get("file", "")
+
+    # Status icon and color
+    status_map = {
+        "applied": ("✅", "32"),       # green
+        "created": ("✅", "32"),
+        "no_match": ("❌", "31"),       # red
+        "ambiguous": ("⚠️ ", "33"),     # yellow
+        "error": ("❌", "31"),
+        "validation_error": ("🔒", "33"),
+        "rolled_back": ("↩️ ", "33"),
+    }
+    icon, color = status_map.get(status, ("?", "0"))
+
+    lines = [_color(f"{icon} {file_path}", color)]
+
+    if result.get("match_type"):
+        conf = result.get("confidence", 0)
+        conf_color = "32" if conf >= 0.95 else "33" if conf >= 0.85 else "31"
+        lines.append(f"   Match: {result['match_type']} ({_color(f'{conf:.1%}', conf_color)} confidence)")
+
+    if result.get("error"):
+        lines.append(f"   Error: {_color(result['error'], '31')}")
+
+    if result.get("validated"):
+        lines.append(f"   Syntax: {_color('validated ✓', '32')}")
+
+    return "\n".join(lines)
+
+
+def _print_results(results: list, fmt: str, show_diff: bool = False):
+    """Print results in the specified format."""
+    if fmt == "human":
+        for r in results:
+            print(_format_human_result(r))
+            if show_diff and r.get("diff"):
+                # Colorize diff output
+                for line in r["diff"].splitlines():
+                    if line.startswith('+') and not line.startswith('+++'):
+                        print(_color(f"   {line}", "32"))
+                    elif line.startswith('-') and not line.startswith('---'):
+                        print(_color(f"   {line}", "31"))
+                    elif line.startswith('@@'):
+                        print(_color(f"   {line}", "36"))
+                    else:
+                        print(f"   {line}")
+        if len(results) > 1:
+            applied = sum(1 for r in results if r.get("status") == "applied")
+            total = len(results)
+            print(f"\n{_color(f'{applied}/{total} edits applied', '1')}")
+    else:
+        if len(results) == 1:
+            print(json.dumps(results[0], indent=2))
+        else:
+            print(json.dumps(results, indent=2))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hk",
@@ -1640,6 +1712,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--atomic",
         action="store_true",
         help="Atomic transaction: all edits succeed or all are rolled back",
+    )
+    apply_parser.add_argument(
+        "--format",
+        choices=["json", "human"],
+        default=None,
+        help="Output format: json (default for pipes) or human (colored, readable)",
     )
 
     # Create command
@@ -1869,10 +1947,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         for fp, content in file_backups.items():
             _save_backup(fp, "edit", content=content, timestamp=ts)
 
-        if len(results) == 1:
-            print(json.dumps(results[0], indent=2))
-        else:
-            print(json.dumps(results, indent=2))
+        fmt = args.format or ("human" if _is_tty() else "json")
+        _print_results(results, fmt, show_diff=args.diff)
         return 0
 
     # ── Non-atomic mode (default) ────────────────────────────────
@@ -1901,8 +1977,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if result.status == "applied" and not args.dry_run and original_content is not None:
             _save_backup(file_path, "edit", content=original_content)
 
-        # Print diff to stderr if requested
-        if args.diff and result.diff:
+        # Print diff to stderr if requested (json mode only — human mode inlines it)
+        fmt = args.format or ("human" if _is_tty() else "json")
+        if fmt == "json" and args.diff and result.diff:
             print(result.diff, file=sys.stderr, end='')
 
         results.append(result_to_dict(result))
@@ -1912,10 +1989,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif result.status == "ambiguous":
             exit_code = max(exit_code, 2)
 
-    if len(results) == 1:
-        print(json.dumps(results[0], indent=2))
-    else:
-        print(json.dumps(results, indent=2))
+    _print_results(results, fmt, show_diff=args.diff)
 
     return exit_code
 
